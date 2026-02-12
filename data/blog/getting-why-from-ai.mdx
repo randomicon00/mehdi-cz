@@ -1,0 +1,86 @@
+---
+title: "Getting the 'Why' from AI: A Guide to Human-Centric AI Interactions"
+date: "2024-12-29"
+tags: ["ai", "prompt engineering", "communication", "explanation", "user perspective"]
+draft: false
+summary: "Learn how to prompt AI for user-centric, purpose-driven explanations instead of simple code breakdowns."
+---
+
+AI is powerful—but only if you ask the right questions. Generic prompts yield mechanical, step-by-step responses. To get meaningful, human-focused explanations, ask for the "why" and include context.
+
+## The Issue with Generic Prompts
+
+Example JavaScript function:
+
+```javascript
+function calculateTotalPrice(items) {
+  let total = 0;
+  for (let i = 0; i < items.length; i++) {
+    total += items[i].price * items[i].quantity;
+  }
+  return total;
+}
+```
+
+A prompt like "Explain this code" often just lists what the code does, missing its purpose.
+
+## How to Get Better Explanations
+
+#### User Perspective:
+
+Explain as if talking to a customer calculating their shopping cart total.
+
+#### Purpose Focus:
+
+What problem does this code solve? Why is it written this way?
+
+#### Context:
+
+Assume this code is part of an online store’s order processing. Describe its role.
+
+## Example Prompts
+
+#### User-Centric:
+
+Explain this code as if explaining to a user on an e-commerce site.
+
+#### Purpose-Focused:
+
+Explain the purpose of this code. What problem does it address?
+
+#### Contextual:
+
+Assume this code is part of an online store. Describe its role in order processing.
+
+#### Iterative Refinement
+
+If the answer remains too technical, ask follow-up questions, for example:
+What does the items array represent here?
+
+## Summary
+
+Focus your prompts on "why" rather than just "how." This approach yields explanations that are practical, contextual, and user-centered.
+
+## Why this matters
+
+- Clear “why” leads to better “how.” AI can surface trade-offs you might miss.
+- Teams align faster when rationale is written down.
+- Decisions become teachable artifacts, not tribal knowledge.
+
+## How to use this today
+
+- Ask AI to list options with pros/cons and a recommendation.
+- Require a short rationale in PRs for non-trivial changes.
+- Save rationales in ADRs (Architecture Decision Records).
+
+## Common pitfalls
+
+- False certainty: ask for confidence levels and unknowns.
+- Cherry-picking: compare at least two viable paths.
+- Stale decisions: revisit when assumptions change.
+
+## What to try next
+
+- Generate ADR templates prefilled from issues.
+- Ask AI to link decisions to metrics and alert thresholds.
+- Run quarterly reviews of old decisions for drift.

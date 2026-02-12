@@ -1,0 +1,733 @@
+---
+title: "Today I Learnt: TypeScript Decorators"
+date: "2025-09-17"
+tags: ["typescript", "decorators", "metadata", "aop", "til"]
+draft: false
+summary: "Exploring TypeScript decorators - a powerful feature for metaprogramming that enables aspect-oriented programming, metadata attachment, and code transformation at design time."
+---
+
+# Today I Learnt: TypeScript Decorators
+
+TypeScript decorators are a powerful feature that enables metaprogramming, aspect-oriented programming, and metadata-driven development. They allow you to modify or annotate classes, methods, properties, and parameters at design time, opening up possibilities for frameworks, libraries, and advanced patterns.
+
+## What are Decorators?
+
+Decorators are functions that can modify the behavior of classes, methods, properties, or parameters. They use the `@` symbol and are executed at design time (compile time), not runtime.
+
+```typescript
+// Class decorator
+@sealed
+class User {
+  @readonly
+  name: string;
+
+  @log
+  greet(@required message: string) {
+    return `Hello ${this.name}: ${message}`;
+  }
+}
+```
+
+## Decorator Types
+
+### Class Decorators
+
+```typescript
+// Class decorator function
+function sealed(constructor: Function) {
+  Object.seal(constructor);
+  Object.seal(constructor.prototype);
+}
+
+// Usage
+@sealed
+class User {
+  name: string;
+
+  constructor(name: string) {
+    this.name = name;
+  }
+}
+
+// Advanced class decorator with options
+interface LoggerOptions {
+  prefix?: string;
+  level?: "info" | "warn" | "error";
+}
+
+function logger(options: LoggerOptions = {}) {
+  return function <T extends { new (...args: any[]): {} }>(constructor: T) {
+    return class extends constructor {
+      createdAt = new Date();
+
+      constructor(...args: any[]) {
+        super(...args);
+        console.log(`${options.prefix || ""}Created instance of ${constructor.name}`);
+      }
+    };
+  };
+}
+
+@logger({ prefix: "[USER] ", level: "info" })
+class User {
+  constructor(public name: string) {}
+}
+```
+
+### Method Decorators
+
+```typescript
+// Method decorator for logging
+function log(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+  const originalMethod = descriptor.value;
+
+  descriptor.value = function (...args: any[]) {
+    console.log(`Calling ${propertyKey} with args:`, args);
+    const result = originalMethod.apply(this, args);
+    console.log(`${propertyKey} returned:`, result);
+    return result;
+  };
+
+  return descriptor;
+}
+
+// Method decorator for memoization
+function memoize(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+  const originalMethod = descriptor.value;
+  const cache = new Map();
+
+  descriptor.value = function (...args: any[]) {
+    const key = JSON.stringify(args);
+    if (cache.has(key)) {
+      return cache.get(key);
+    }
+
+    const result = originalMethod.apply(this, args);
+    cache.set(key, result);
+    return result;
+  };
+
+  return descriptor;
+}
+
+// Usage
+class Calculator {
+  @log
+  @memoize
+  expensiveCalculation(n: number): number {
+    console.log(`Computing expensive calculation for ${n}`);
+    return n * n * Math.sin(n);
+  }
+}
+```
+
+### Property Decorators
+
+```typescript
+// Property decorator for validation
+function required(target: any, propertyKey: string) {
+  const privateKey = `_${propertyKey}`;
+
+  Object.defineProperty(target, propertyKey, {
+    get() {
+      return this[privateKey];
+    },
+    set(value: any) {
+      if (value === undefined || value === null) {
+        throw new Error(`${propertyKey} is required`);
+      }
+      this[privateKey] = value;
+    },
+    enumerable: true,
+    configurable: true,
+  });
+}
+
+// Property decorator for default values
+function defaultValue(value: any) {
+  return function (target: any, propertyKey: string) {
+    const privateKey = `_${propertyKey}`;
+
+    Object.defineProperty(target, propertyKey, {
+      get() {
+        return this[privateKey] !== undefined ? this[privateKey] : value;
+      },
+      set(val: any) {
+        this[privateKey] = val;
+      },
+      enumerable: true,
+      configurable: true,
+    });
+  };
+}
+
+// Usage
+class User {
+  @required
+  name: string;
+
+  @defaultValue("user@example.com")
+  email: string;
+
+  @defaultValue(18)
+  age: number;
+}
+```
+
+### Parameter Decorators
+
+```typescript
+// Parameter decorator for validation
+function validate(type: "string" | "number" | "boolean") {
+  return function (target: any, propertyKey: string, parameterIndex: number) {
+    const existingValidators = target[`${propertyKey}_validators`] || [];
+    existingValidators[parameterIndex] = type;
+    target[`${propertyKey}_validators`] = existingValidators;
+  };
+}
+
+// Method decorator that uses parameter validation
+function validated(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+  const originalMethod = descriptor.value;
+  const validators = target[`${propertyKey}_validators`] || [];
+
+  descriptor.value = function (...args: any[]) {
+    // Validate parameters
+    validators.forEach((validator: string, index: number) => {
+      const arg = args[index];
+      if (validator === "string" && typeof arg !== "string") {
+        throw new Error(`Parameter ${index} must be a string`);
+      }
+      if (validator === "number" && typeof arg !== "number") {
+        throw new Error(`Parameter ${index} must be a number`);
+      }
+    });
+
+    return originalMethod.apply(this, args);
+  };
+
+  return descriptor;
+}
+
+// Usage
+class API {
+  @validated
+  createUser(@validate("string") name: string, @validate("number") age: number) {
+    return { name, age };
+  }
+}
+```
+
+## Advanced Decorator Patterns
+
+### Decorator Composition
+
+```typescript
+// Multiple decorators on the same target
+function timing(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+  const originalMethod = descriptor.value;
+
+  descriptor.value = function (...args: any[]) {
+    const start = Date.now();
+    const result = originalMethod.apply(this, args);
+    const end = Date.now();
+    console.log(`${propertyKey} took ${end - start}ms`);
+    return result;
+  };
+
+  return descriptor;
+}
+
+function cache(ttl: number = 5000) {
+  return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const originalMethod = descriptor.value;
+    const cache = new Map();
+
+    descriptor.value = function (...args: any[]) {
+      const key = JSON.stringify(args);
+      const cached = cache.get(key);
+
+      if (cached && Date.now() - cached.timestamp < ttl) {
+        return cached.value;
+      }
+
+      const result = originalMethod.apply(this, args);
+      cache.set(key, { value: result, timestamp: Date.now() });
+      return result;
+    };
+
+    return descriptor;
+  };
+}
+
+class DataService {
+  @timing
+  @cache(10000)
+  async fetchData(id: string) {
+    // Simulate API call
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    return { id, data: `Data for ${id}` };
+  }
+}
+```
+
+### Metadata Reflection
+
+```typescript
+// Using reflect-metadata for runtime metadata
+import "reflect-metadata";
+
+function column(name?: string) {
+  return function (target: any, propertyKey: string) {
+    const columns = Reflect.getMetadata("columns", target.constructor) || [];
+    columns.push({
+      property: propertyKey,
+      column: name || propertyKey,
+    });
+    Reflect.defineMetadata("columns", columns, target.constructor);
+  };
+}
+
+function table(name: string) {
+  return function (constructor: Function) {
+    Reflect.defineMetadata("table", name, constructor);
+  };
+}
+
+@table("users")
+class User {
+  @column("user_id")
+  id: number;
+
+  @column()
+  name: string;
+
+  @column("email_address")
+  email: string;
+}
+
+// Usage with metadata
+function createSelectQuery<T>(entityClass: new () => T): string {
+  const tableName = Reflect.getMetadata("table", entityClass);
+  const columns = Reflect.getMetadata("columns", entityClass) || [];
+
+  const columnNames = columns.map((col: any) => col.column).join(", ");
+  return `SELECT ${columnNames} FROM ${tableName}`;
+}
+
+console.log(createSelectQuery(User)); // "SELECT user_id, name, email_address FROM users"
+```
+
+### Dependency Injection
+
+```typescript
+// Simple DI container using decorators
+class Container {
+  private services = new Map();
+
+  register(token: string, implementation: any) {
+    this.services.set(token, implementation);
+  }
+
+  resolve<T>(token: string): T {
+    return this.services.get(token);
+  }
+}
+
+const container = new Container();
+
+// Injectable decorator
+function injectable(token?: string) {
+  return function (constructor: Function) {
+    const serviceToken = token || constructor.name;
+    container.register(serviceToken, new (constructor as any)());
+  };
+}
+
+// Inject decorator
+function inject(token: string) {
+  return function (target: any, propertyKey: string) {
+    const privateKey = `_${propertyKey}`;
+
+    Object.defineProperty(target, propertyKey, {
+      get() {
+        if (!this[privateKey]) {
+          this[privateKey] = container.resolve(token);
+        }
+        return this[privateKey];
+      },
+      enumerable: true,
+      configurable: true,
+    });
+  };
+}
+
+// Usage
+@injectable()
+class Logger {
+  log(message: string) {
+    console.log(`[LOG] ${message}`);
+  }
+}
+
+@injectable()
+class UserService {
+  @inject("Logger")
+  private logger: Logger;
+
+  createUser(name: string) {
+    this.logger.log(`Creating user: ${name}`);
+    return { id: Date.now(), name };
+  }
+}
+
+const userService = container.resolve<UserService>("UserService");
+userService.createUser("John Doe");
+```
+
+## Framework-like Decorators
+
+### Route Decorators (Express-like)
+
+```typescript
+// HTTP method decorators
+function get(path: string) {
+  return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const routes = target.constructor.routes || [];
+    routes.push({
+      method: "GET",
+      path,
+      handler: descriptor.value,
+      propertyKey,
+    });
+    target.constructor.routes = routes;
+  };
+}
+
+function post(path: string) {
+  return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const routes = target.constructor.routes || [];
+    routes.push({
+      method: "POST",
+      path,
+      handler: descriptor.value,
+      propertyKey,
+    });
+    target.constructor.routes = routes;
+  };
+}
+
+// Controller decorator
+function controller(prefix: string = "") {
+  return function (constructor: Function) {
+    const routes = constructor.routes || [];
+    constructor.prototype.routes = routes.map((route: any) => ({
+      ...route,
+      path: prefix + route.path,
+    }));
+  };
+}
+
+// Usage
+@controller("/api/users")
+class UserController {
+  @get("/")
+  getUsers() {
+    return [{ id: 1, name: "John" }];
+  }
+
+  @get("/:id")
+  getUser(id: string) {
+    return { id, name: "John" };
+  }
+
+  @post("/")
+  createUser(data: any) {
+    return { id: Date.now(), ...data };
+  }
+}
+```
+
+### Validation Decorators
+
+```typescript
+// Validation decorators
+function minLength(min: number) {
+  return function (target: any, propertyKey: string) {
+    const validations = target[`${propertyKey}_validations`] || [];
+    validations.push((value: any) => {
+      if (typeof value === "string" && value.length < min) {
+        throw new Error(`${propertyKey} must be at least ${min} characters long`);
+      }
+    });
+    target[`${propertyKey}_validations`] = validations;
+  };
+}
+
+function email(target: any, propertyKey: string) {
+  const validations = target[`${propertyKey}_validations`] || [];
+  validations.push((value: any) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (typeof value === "string" && !emailRegex.test(value)) {
+      throw new Error(`${propertyKey} must be a valid email`);
+    }
+  });
+  target[`${propertyKey}_validations`] = validations;
+}
+
+// Validate decorator
+function validate(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+  const originalMethod = descriptor.value;
+
+  descriptor.value = function (...args: any[]) {
+    // Validate properties
+    for (const prop in this) {
+      if (this.hasOwnProperty(prop)) {
+        const validations = this[`${prop}_validations`];
+        if (validations) {
+          validations.forEach((validation: Function) => validation(this[prop]));
+        }
+      }
+    }
+
+    return originalMethod.apply(this, args);
+  };
+
+  return descriptor;
+}
+
+// Usage
+class User {
+  @minLength(2)
+  name: string;
+
+  @email
+  email: string;
+
+  constructor(name: string, email: string) {
+    this.name = name;
+    this.email = email;
+  }
+
+  @validate
+  save() {
+    console.log("Saving user:", this);
+    return this;
+  }
+}
+```
+
+## Decorator Factories
+
+```typescript
+// Decorator factory for configuration
+function throttle(delay: number) {
+  return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const originalMethod = descriptor.value;
+    let lastCall = 0;
+
+    descriptor.value = function (...args: any[]) {
+      const now = Date.now();
+      if (now - lastCall >= delay) {
+        lastCall = now;
+        return originalMethod.apply(this, args);
+      }
+    };
+
+    return descriptor;
+  };
+}
+
+function debounce(delay: number) {
+  return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const originalMethod = descriptor.value;
+    let timeoutId: NodeJS.Timeout;
+
+    descriptor.value = function (...args: any[]) {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        originalMethod.apply(this, args);
+      }, delay);
+    };
+
+    return descriptor;
+  };
+}
+
+// Usage
+class SearchService {
+  @throttle(300)
+  searchImmediate(query: string) {
+    console.log("Searching immediately:", query);
+  }
+
+  @debounce(500)
+  searchDebounced(query: string) {
+    console.log("Searching after debounce:", query);
+  }
+}
+```
+
+## Best Practices
+
+### Decorator Ordering
+
+```typescript
+// Decorators execute bottom-up, but are applied top-down
+class Example {
+  @log
+  @validate
+  @memoize
+  method() {
+    // Execution order:
+    // 1. memoize wraps the original method
+    // 2. validate wraps the memoized method
+    // 3. log wraps the validated method
+  }
+}
+```
+
+### Error Handling
+
+```typescript
+// Safe decorator application
+function safeDecorator(decorator: Function) {
+  return function (...args: any[]) {
+    try {
+      return decorator.apply(this, args);
+    } catch (error) {
+      console.error("Decorator error:", error);
+      // Return original descriptor if decorator fails
+      return args[2]; // descriptor
+    }
+  };
+}
+
+// Usage
+const safeLog = safeDecorator(log);
+```
+
+### Performance Considerations
+
+```typescript
+// Avoid expensive operations in decorators
+function badDecorator(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+  // ❌ Don't do expensive work here - runs at class definition time
+  const data = fetch("https://api.example.com/data").then(/* ... */);
+
+  return descriptor;
+}
+
+// Instead, defer expensive operations
+function lazyLoad(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+  const originalMethod = descriptor.value;
+
+  descriptor.value = function (...args: any[]) {
+    // ✅ Do expensive work only when method is called
+    if (!this._loadedData) {
+      this._loadedData = fetch("https://api.example.com/data");
+    }
+
+    return this._loadedData.then(() => {
+      return originalMethod.apply(this, args);
+    });
+  };
+
+  return descriptor;
+}
+```
+
+## Real-World Examples
+
+### Angular-style Component Decorator
+
+```typescript
+interface ComponentOptions {
+  selector: string;
+  template: string;
+  styles?: string[];
+}
+
+function Component(options: ComponentOptions) {
+  return function (constructor: Function) {
+    // Store metadata
+    constructor.prototype.selector = options.selector;
+    constructor.prototype.template = options.template;
+    constructor.prototype.styles = options.styles || [];
+
+    // Add lifecycle methods
+    const originalOnInit = constructor.prototype.ngOnInit;
+    constructor.prototype.ngOnInit = function () {
+      console.log(`Component ${options.selector} initialized`);
+      if (originalOnInit) {
+        originalOnInit.call(this);
+      }
+    };
+  };
+}
+
+@Component({
+  selector: "app-user-card",
+  template: "<div>{{user.name}}</div>",
+  styles: [".card { border: 1px solid #ccc; }"],
+})
+class UserCardComponent {
+  user: { name: string };
+
+  ngOnInit() {
+    this.user = { name: "John Doe" };
+  }
+}
+```
+
+### Database Model Decorator
+
+```typescript
+interface ModelOptions {
+  tableName: string;
+  timestamps?: boolean;
+}
+
+function Model(options: ModelOptions) {
+  return function (constructor: Function) {
+    // Add static methods
+    constructor.findAll = async function () {
+      // Simulate database query
+      return [{ id: 1, name: "Item 1" }];
+    };
+
+    constructor.findById = async function (id: number) {
+      // Simulate database query
+      return { id, name: `Item ${id}` };
+    };
+
+    // Add instance methods
+    constructor.prototype.save = async function () {
+      console.log(`Saving ${options.tableName}:`, this);
+      return this;
+    };
+
+    constructor.prototype.destroy = async function () {
+      console.log(`Destroying ${options.tableName} with id:`, this.id);
+    };
+  };
+}
+
+@Model({ tableName: "users", timestamps: true })
+class User {
+  id: number;
+  name: string;
+  email: string;
+
+  constructor(data: Partial<User>) {
+    Object.assign(this, data);
+  }
+}
+
+// Usage
+const users = await User.findAll();
+const user = await User.findById(1);
+await user.save();
+```
+
+TypeScript decorators are a powerful tool for metaprogramming and creating declarative APIs. They enable patterns like dependency injection, validation, logging, and framework development. Understanding decorators opens up new possibilities for creating maintainable and expressive code.

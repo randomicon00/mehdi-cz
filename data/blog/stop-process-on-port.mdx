@@ -1,0 +1,105 @@
+---
+title: "How to Stop a Process Running on a Specific Port"
+date: "2025-09-10"
+tags: ["linux", "ports", "process management", "networking", "ss", "lsof", "fuser"]
+draft: false
+summary: Learn multiple methods to identify and stop processes occupying a specific port, using commands like `lsof`, `ss`, and `fuser`, especially when standard tools aren’t available.
+---
+
+Today, I ran into an issue where a process was still occupying a port even after I’d closed the terminal running it. I needed to free up the port (5001 in my case), so I could use it for another service. Now, typically, there are a few straightforward commands that would do the trick, but I didn’t have `lsof` or `netstat` installed, which meant finding alternative solutions.
+
+Here’s a rundown of the different methods I explored to stop a process using a specific port, including the `fuser` command that ultimately saved the day.
+
+### Using `ss`: A Modern Alternative to `netstat`
+
+The `ss` command, available on most modern Linux distributions, allows us to view sockets in use on a system. Unlike `netstat`, `ss` is faster and doesn’t require separate installation in most cases.
+
+To list processes on a specific port (5001 in this example), I ran:
+
+```bash
+ss -tuln | grep 5001
+```
+
+Here’s a quick breakdown:
+
+`-tuln`: This flag combines several options:
+
+- `-t` for TCP connections.
+- `-u` for UDP connections.
+- `-l` to show listening sockets.
+- `-n` to skip resolving hostnames (for speed).
+
+`grep 5001`: Filters the output to show only lines containing “5001,” which isolates any connection using that port.
+Example Output:
+
+```markdown
+tcp LISTEN 0 511 _:5001 _:\*
+```
+
+This output confirmed that something was listening on port 5001. Unfortunately, ss alone doesn’t give us the PID, so I couldn’t kill the process directly with this information.
+
+### 2. Using `lsof`: The Classic Option
+
+Typically, `lsof` (List Open Files) would be my first go-to for finding processes occupying a specific port, as it’s very straightforward:
+
+```bash
+lsof -i :5001
+```
+
+This command does the following:
+
+- `-i :5001`: Lists any files (or network sockets) associated with port 5001.
+
+Example Output:
+
+```text
+COMMAND   PID USER   FD   TYPE DEVICE SIZE/OFF NODE NAME
+myapp    12345 user   3u  IPv4  12345      0t0  TCP *:5001 (LISTEN)
+```
+
+If I’d had lsof, this output would’ve shown the PID (e.g., 12345), and I could have simply run:
+
+```bash
+kill -9 12345
+```
+
+But since lsof wasn’t installed, I had to find another option.
+
+### 3. Using `netstat`: Another Classic (if Available)
+
+Like lsof, netstat is useful but often not pre-installed on modern systems. It can be used similarly to identify ports in use:
+
+```bash
+netstat -tuln | grep 5001
+```
+
+Explanation:
+
+`-tuln` options mean the same as with ss, filtering the output to show only listening sockets without resolving hostnames.
+However, I didn’t have netstat either, so this wasn’t an option.
+
+### 4. The Winner: `fuser` to Find and Kill by Port
+
+After trying the above commands, fuser ended up being the lifesaver. The `fuser` command shows which process IDs (PIDs) are using a specific file or network port. In my case, I used it as follows:
+
+```bash
+fuser 5001/tcp
+```
+
+Example Output:
+
+```bash
+5001/tcp:            108371
+```
+
+This output gave me the PID `108371`, showing that this process was using port 5001. From there, I ran:
+
+```bash
+kill -9 108371
+```
+
+This killed the process instantly, and port 5001 was freed up.
+
+### Last Words
+
+When a process is occupying a port, several commands (`ss`, `lsof`, `netstat`, and `fuser`) can be used to identify and stop it. `fuser` turned out to be my go-to in this case due to limited options, and it worked perfectly. Now, when facing a similar issue, I know that `fuser` is a reliable option to try if `lsof` or `netstat` aren’t available.

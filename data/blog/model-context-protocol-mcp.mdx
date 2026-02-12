@@ -1,0 +1,83 @@
+---
+title: "Understanding Model Context Protocol (MCP) for Developers"
+date: "2025-09-16"
+tags: ["ai", "mcp", "protocol", "integration"]
+draft: false
+summary: "Learn how Model Context Protocol enables seamless integration between AI models and development tools."
+---
+
+Model Context Protocol (MCP) standardizes how AI models access external tools and data sources, making AI integration more reliable and secure.
+
+## What is MCP?
+
+MCP defines a standard way for AI models to:
+
+- Access local files and databases
+- Execute system commands safely
+- Integrate with APIs and services
+- Maintain context across sessions
+
+## Basic MCP Server Implementation
+
+```python
+from mcp import Server, Tool
+import os
+
+class DevToolsServer(Server):
+    def __init__(self):
+        super().__init__("dev-tools")
+        self.register_tools()
+
+    def register_tools(self):
+        @self.tool("read_file")
+        def read_file(path: str) -> str:
+            """Read contents of a file safely"""
+            if not os.path.exists(path):
+                return "File not found"
+
+            with open(path, 'r') as f:
+                return f.read()
+
+        @self.tool("list_directory")
+        def list_directory(path: str) -> list:
+            """List files in directory"""
+            try:
+                return os.listdir(path)
+            except OSError:
+                return []
+
+        @self.tool("run_command")
+        def run_command(cmd: str) -> str:
+            """Execute shell command safely"""
+            import subprocess
+            allowed_commands = ['ls', 'git', 'npm', 'python']
+
+            if not any(cmd.startswith(allowed) for allowed in allowed_commands):
+                return "Command not allowed"
+
+            result = subprocess.run(cmd.split(), capture_output=True, text=True)
+            return f"Exit code: {result.returncode}\n{result.stdout}\n{result.stderr}"
+
+# Start server
+server = DevToolsServer()
+server.run(port=8000)
+```
+
+## Client Integration
+
+```python
+import requests
+
+def query_mcp_server(tool_name, **kwargs):
+    response = requests.post(
+        "http://localhost:8000/tools/invoke",
+        json={"tool": tool_name, "arguments": kwargs}
+    )
+    return response.json()
+
+# Usage
+files = query_mcp_server("list_directory", path="./src")
+content = query_mcp_server("read_file", path="./package.json")
+```
+
+**Benefits:** Secure, standardized AI-tool integration with proper permission boundaries and audit trails.

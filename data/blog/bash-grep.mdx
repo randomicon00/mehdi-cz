@@ -1,0 +1,15 @@
+---
+title: "Search text quickly with grep"
+date: "2025-09-16"
+tags: ["bash", "til"]
+draft: false
+summary: "Use grep for pattern search; -R to recurse, -n for line numbers, -i for ignore-case."
+---
+
+```bash
+grep -nR "pattern" .
+# show 2 lines of context
+grep -n -C2 pattern file.txt
+```
+
+Tip: `rg` (ripgrep) is a faster modern alternative.

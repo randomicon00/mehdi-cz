@@ -1,0 +1,16 @@
+---
+title: "Control resources with ulimit"
+date: "2025-09-16"
+tags: ["bash", "til"]
+draft: false
+summary: "Use ulimit to set resource limits for shells and processes."
+---
+
+Example: limit core file size and open files:
+
+```bash
+ulimit -c 0
+ulimit -n 1024
+```
+
+Tip: `ulimit -a` displays current limits.

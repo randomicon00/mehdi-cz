@@ -1,0 +1,64 @@
+---
+title: "The Purpose of the `never` Type in TypeScript"
+date: "2025-01-14"
+tags: ["typescript", "never", "best practices", "2024"]
+draft: false
+summary: The `never` type in TypeScript represents a value that never occurs. It is used for functions that never return, throw exceptions, or have unreachable code paths.
+---
+
+### The Purpose of the `never` Type in TypeScript
+
+In TypeScript, the `never` type represents values that **never occur**. It is typically used when a function never returns (e.g., infinite loops or exceptions), or when the type system determines certain branches of code are unreachable.
+
+#### Example 1: Assigning `never`
+
+Variables of type `never` cannot hold any other type of value, not even `null` or `undefined`.
+
+```typescript
+let variable: void = null;
+let variable1: never = null; // error: Type 'null' is not assignable to type 'never'
+let variable2: never = 1; // error: Type 'number' is not assignable to type 'never'
+let variable3: never = "geek"; // error: Type 'string' is not assignable to type 'never'
+let variable4: never = true; // error: Type 'boolean' is not assignable to type 'never'
+```
+
+#### Example 2: Infinite Loops and Unreachable Code
+
+Functions that are guaranteed to never complete can have a return type of `never`. This includes infinite loops or functions that always throw errors.
+
+```ts
+function infiniteLoop(): never {
+  while (true) {} // This function never stops executing
+}
+
+function greet(): never {
+  while (true) {
+    console.log("hello");
+  }
+}
+```
+
+These functions never have an endpoint, so their return type is `never`.
+
+#### Example 3: Throwing Exceptions
+
+If a function always throws an error and never returns a value, its return type should be `never`.
+
+```ts
+function throwTypeError(message: string): never {
+  throw new TypeError(message); // This function never returns
+}
+
+function func(): never {
+  return throwTypeError("An error occurred"); // The return type is `never` since it throws an error
+}
+```
+
+Here, both `throwTypeError` and `func` are of type `never` because they throw errors and never return.
+
+### When to Use never
+
+1. **Unreachable Code**: Use `never` when you’re sure certain code paths are impossible. For example, in exhaustive type checking or guards, the type may narrow to `never` if all possibilities are ruled out. 2.**Error Handling**: Functions that only throw exceptions and `never` return a value should be marked as `never`.
+2. **Infinite Loops**: Functions that run infinitely without returning, such as servers or loops, should have a `never` return type.
+
+In short, `never` signifies that something never happens—no value, no return, no completion. It’s a powerful tool to increase the robustness of your code and ensure clarity for unreachable paths or intentional non-returning functions.

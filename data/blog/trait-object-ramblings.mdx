@@ -1,0 +1,52 @@
+---
+title: "Today I Learned: Understanding the Complexity of dyn Trait in Rust"
+date: "2025-01-30"
+tags: ["Rust", "Traits", "Generics", "Lifetimes"]
+draft: false
+summary: Exploring what dyn Trait is—and isn’t—in Rust, including type, lifetime, and generic distinctions that make it both powerful and complex.
+---
+
+In Rust, working with `dyn Trait` seems straightforward until you dig into what it actually is—and isn’t. Here are a few fundamental truths about `dyn Trait` that clarify why it's so versatile yet sometimes confusing.
+
+### dyn Trait is Unsized
+
+`dyn Trait` is dynamically sized, which means Rust doesn’t know its size at compile time. This poses a problem for generic functions because they assume `Sized` by default. You have to use `?Sized` in your generic function to accept a trait object:
+
+```rust
+// Accepts only `Sized` types, so it fails for `&dyn Trait`
+fn foo<T: Trait>(t: &T) {}
+
+// Accepts `T: Trait + ?Sized`, so it works with `dyn Trait`
+fn bar<T: Trait + ?Sized>(t: &T) {}
+```
+
+### `dyn Trait` Isn’t a Generic or Dynamically Typed
+
+`dyn Trait` is a concrete type at compile time—just one that’s dynamically sized and type-erased. This means that while a `Box<T>` is a thin pointer specifically to `T`, a `Box<dyn Trait>` is a wide pointer that includes a reference to a vtable for dynamic dispatch. Importantly, `dyn Trait` isn’t a subtype of types that implement the trait; it just represents an erased type implementing Trait.
+
+### Example of Monomorphization vs. Dynamic Dispatch
+
+Here’s how it works in practice. With generics, Rust generates a specialized version of the function for each type, known as monomorphization:
+
+```rust
+fn generic<T: Trait>(x: &T) {}
+generic::<String>(&String::from("hello"));
+```
+
+For a `dyn Trait`, only one function exists in the compiled code, relying on dynamic dispatch for method calls:
+
+```rust
+fn dynamic_dispatch(x: &dyn Trait) {}
+```
+
+### dyn Trait is Not a Supertype
+
+While you can convert a concrete type into a `dyn Trait` reference, it’s not a “supertype” of all `Trait` implementors. The conversion is an unsizing coercion, which modifies the memory layout by turning a thin pointer into a wide pointer with a vtable. This layout change reinforces that `dyn Trait` is fundamentally distinct from types implementing `Trait`.
+
+### In Summary
+
+`dyn Trait + 'a` is:
+
+- A concrete, statically known type with an attached lifetime (`'a`)
+- Always unsized and requires a pointer, like `&` or `Box`, to be used
+- Not a subtype, generic, or dynamically typed entity

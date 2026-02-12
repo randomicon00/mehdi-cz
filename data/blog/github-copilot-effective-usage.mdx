@@ -1,0 +1,68 @@
+---
+title: "Using GitHub Copilot Effectively in Your Workflow"
+date: "2025-09-16"
+tags: ["ai", "github", "copilot", "vscode"]
+draft: false
+summary: "Maximize GitHub Copilot's potential with smart usage patterns and keyboard shortcuts."
+---
+
+GitHub Copilot works best when you provide clear context and use it as a coding partner, not just an autocomplete tool.
+
+## Key Shortcuts (VS Code)
+
+```
+Tab - Accept suggestion
+Ctrl+→ - Accept word
+Ctrl+] - Next suggestion
+Ctrl+[ - Previous suggestion
+Ctrl+Enter - Open suggestions panel
+```
+
+## Effective Usage Patterns
+
+**Write clear comments first:**
+
+```js
+// Create a debounced search function that waits 300ms
+// and cancels previous requests
+const debouncedSearch =
+```
+
+**Use descriptive function names:**
+
+```js
+function validateEmailAndSendWelcomeEmail(email) {
+  // Copilot will suggest the implementation
+}
+```
+
+## Pro Tips
+
+- Write tests first - Copilot excels at implementing to match test cases
+- Use it for boilerplate generation (configs, schemas, types)
+- Leverage it for code translation between languages
+- Review all suggestions - don't blindly accept
+
+## Why this matters
+
+- Copilot accelerates flow, but intent and review are still yours.
+- Small, clear prompts produce code you can own.
+- You’ll spend more time designing, less time typing.
+
+## How to use this today
+
+- Write a comment with goal, types, and edge cases; accept selectively.
+- Use ghost text as a suggestion, not a contract—edit freely.
+- Compare multiple completions and pick the simplest.
+
+## Common pitfalls
+
+- Paste-driven development: verify APIs and error handling.
+- Hidden complexity: ask Copilot to explain its suggestion.
+- Ignoring tests: generate tests first for tricky pieces.
+
+## What to try next
+
+- Create repo-level prompt snippets for common patterns.
+- Track acceptance vs edit rates to tune your prompting.
+- Use Copilot in PRs to propose smaller, clearer diffs.

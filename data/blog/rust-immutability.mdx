@@ -1,0 +1,159 @@
+---
+title: "When to Use Mutability in Rust"
+date: "2024-11-20"
+tags: ["mutability", "rust", "programming", "closures", "functional", "immutability", "2024"]
+draft: false
+summary: "Explore the challenges and best practices of working with mutability in Rust, focusing on keeping mutability within tight scopes and understanding when it's required, including examples of closures and dynamic function types."
+---
+
+Mutability is one of those concepts in Rust that I personally struggled with at the beginning. Understanding **when and how often to use mutability** was not immediately clear to me, and it took some trial and error before I realized the importance of limiting mutability to small scopes. In this article, I want to share what I learned and explain why mutability should be embraced only when absolutely necessary, while aiming for immutability as the default.
+
+### Embracing Immutability by Default
+
+In Rust, immutability is the default. This means that, unless explicitly stated otherwise, all variables are immutable:
+
+```rust
+let x = 42;
+x = 23; // error: re-assignment of immutable variable `x`
+```
+
+Initially, I found myself constantly adding `mut` to my variables, especially coming from a background in languages like C++ where mutability is common and often implicit. But Rust's design choice makes a lot of sense—it helps us keep track of state changes and reduces the mental overhead required when writing code. **Immutability reduces cognitive load**, making our programs easier to reason about, test, and debug.
+
+Mutability should be used sparingly, ideally only in **tight scopes** where the benefit outweighs the cost of complexity. Let's see some concrete examples.
+
+### Example: Limiting Mutability to Small Scopes
+
+Consider the following Rust function that modifies a value in a tight scope:
+
+```rust
+fn main() {
+    let mut x = 42;
+    modify_value(&mut x);
+    println!("{}", x);
+}
+
+fn modify_value(val: &mut i32) {
+    *val += 1;
+}
+```
+
+In this case, `x` is mutable only for the duration that it's needed. The mutability is **scoped**, meaning that the `mut` keyword is only used in a very specific context, and the scope of potential errors is minimized. This is a good practice to follow in Rust.
+
+Compare this to languages like C++, where you need to read through an entire function body to understand if and where a variable is modified. Rust’s requirement of explicit mutability makes such code much more transparent and understandable at a glance.
+
+### Practical Example: Closures and Mutability
+
+#### The Need for `&mut dyn FnMut()`
+
+One of the scenarios where I found myself confused was when using **closures** with mutable references. Specifically, the concept of `&mut dyn FnMut()` seemed mysterious at first, but it serves a crucial purpose. Let’s consider the following function signature:
+
+```rust
+pub fn from_src(
+    db: &dyn ExpandDatabase,
+    path: ast::Path,
+    span_for_range: &mut dyn FnMut(::tt::TextRange) -> SyntaxContextId,
+) -> Option<ModPath> {
+    convert_path(db, path, span_for_range)
+}
+```
+
+Here, `span_for_range` is a closure that takes a `TextRange` and returns a `SyntaxContextId`. The `&mut dyn FnMut()` is necessary because the closure **needs to mutate some state**. `FnMut` is used when a closure may modify the environment it captures, and in this case, the `mut` reference means that the closure will change during its execution.
+
+The `&mut` reference allows the closure to be invoked multiple times while retaining the changes between calls. Without `mut`, we wouldn't be able to keep track of changes to the closure's state across multiple invocations.
+
+#### Example with Closures
+
+Here’s a more straightforward example that demonstrates the use of a mutable closure:
+
+```rust
+fn main() {
+    let mut counter = 0;
+    let mut increment = |x: i32| {
+        counter += x;
+        counter
+    };
+
+    // Using &mut FnMut to call the closure repeatedly
+    apply_increment(&mut increment, 5);
+    apply_increment(&mut increment, 3);
+}
+
+fn apply_increment(f: &mut dyn FnMut(i32) -> i32, value: i32) {
+    let result = f(value);
+    println!("Current value: {}", result);
+}
+```
+
+In this example, the closure `increment` modifies its environment (`counter`). The `apply_increment` function takes a mutable reference to the closure and calls it twice, updating the internal `counter` state each time. Using `FnMut` here is essential since the closure **mutates the counter**, and the `mut` reference allows those changes to persist.
+
+This example illustrates the importance of **limiting mutability to small, specific scopes**. The closure is mutable, but its scope of effect is tightly controlled.
+
+### Reconsidering Immutability for Better Design
+
+#### Problematic Mutable Design
+
+Let’s revisit an earlier design I once struggled with—an overly mutable `Mailbox` struct:
+
+```rust
+pub struct Mailbox {
+    emails: Vec<String>,
+    total_word_count: usize,
+}
+
+impl Mailbox {
+    pub fn new() -> Self {
+        Mailbox {
+            emails: Vec::new(),
+            total_word_count: 0,
+        }
+    }
+
+    pub fn add_email(&mut self, email: &str) {
+        self.emails.push(email.to_string());
+        self.total_word_count += email.split_whitespace().count();
+    }
+
+    pub fn get_word_count(&self) -> usize {
+        self.total_word_count
+    }
+}
+```
+
+In this implementation, `add_email` mutates both `emails` and `total_word_count`. This led to potential bugs where if I forgot to update `total_word_count` properly, it could easily go out of sync with the actual content. This experience taught me a valuable lesson—mutability often introduces hidden complexity and dependencies that are easy to overlook.
+
+#### A Better Immutable Design
+
+By embracing immutability, we can significantly simplify the `Mailbox` design:
+
+```rust
+pub struct Mailbox {
+    emails: Vec<String>,
+}
+
+impl Mailbox {
+    pub fn new() -> Self {
+        Mailbox {
+            emails: Vec::new(),
+        }
+    }
+
+    pub fn add_email(&mut self, email: &str) {
+        self.emails.push(email.to_string());
+    }
+
+    pub fn get_word_count(&self) -> usize {
+        self.emails.iter().map(|email| email.split_whitespace().count()).sum()
+    }
+}
+```
+
+In this revised version, we removed `total_word_count` entirely. Instead, `get_word_count` calculates the word count on the fly. Although this may involve additional computation, it prevents the state from becoming inconsistent and makes the code easier to maintain and reason about.
+
+## Summary: Aim for Immutability
+
+- **Immutability as Default**: Rust chooses immutability by default to promote safer and clearer code.
+- **Limit Mutability to Tight Scopes**: Use `mut` only when necessary, and prefer limiting the scope of mutability to make your code easier to understand.
+- **Closures and Mutability**: Understand when `FnMut` is necessary, particularly when dealing with mutable closures that need to retain state between calls.
+- **Move Instead of Mutate**: Prefer ownership transfers (`move`) instead of relying on mutable state.
+
+**Immutability leads to clearer, safer code**, while controlled use of `mut` can help in specific, performance-critical scenarios. Embrace immutability, limit mutability to small, well-defined scopes, and you'll find that your Rust code becomes more predictable, robust, and easier to maintain.

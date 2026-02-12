@@ -1,0 +1,33 @@
+---
+title: "Applying Prettier to All Project Files"
+date: "2024-09-25"
+tags: ["prettier", "nvim", "formatting", "code style"]
+draft: false
+summary: Learn how to apply your Prettier configuration across all files in your project with a single command, avoiding the need for manual file saving in Neovim.
+---
+
+To apply your `Prettier` changes across all files in your project, you can use the following command from your project’s root directory. This will reformat all files in the project based on your `Prettier` configuration:
+
+1. Open your terminal in the root of your project.
+
+2. Run the following command:
+
+```bash
+npx prettier --write .
+```
+
+This command will:
+
+- **Locate all files** in the project (starting from the current directory).
+
+- **Reformat all files** according to your Prettier settings (from .prettierrc or similar configuration files).
+
+## Optional: Limiting to Specific File Types
+
+If you want to format only certain file types, for example, only JavaScript and TypeScript files, you can specify the file types:
+
+```bash
+npx prettier --write "**/*.{js,ts}"
+```
+
+This way, you avoid the need to manually open and save each file in Neovim.

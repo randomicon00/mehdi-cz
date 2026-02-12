@@ -1,0 +1,433 @@
+---
+title: "Behind #[tokio::main]: Peeling Back the Async Runtime"
+date: "2025-12-20"
+tags: ["rust", "tokio", "async", "concurrency", "runtime"]
+draft: false
+summary: "A deep dive into what actually happens when you write #[tokio::main]. We'll tear apart the macro, expose the state machines, and reveal the work-stealing scheduler hiding beneath five lines of code."
+---
+
+# Behind `#[tokio::main]`: Peeling Back the Async Runtime
+
+You write five lines of code:
+
+```rust
+use tokio;
+
+#[tokio::main]
+async fn main() {
+    println!("hello from async!");
+}
+```
+
+And somehow, an entire concurrent runtime springs to life—worker threads spawn, work-stealing queues materialize, and an event loop begins polling. This article tears apart that magic.
+
+## Part 1: The Macro Expansion
+
+That `#[tokio::main]` attribute isn't syntax sugar—it's a complete rewrite of your function. Here's what the compiler actually sees:
+
+```rust
+fn main() {
+    let body = async {
+        println!("hello from async!");
+    };
+
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .expect("Failed building the Runtime")
+        .block_on(body);
+}
+```
+
+Three things happened:
+
+1. **Your `async fn` became a regular `fn`** — `main()` can't actually be async in Rust; there's no runtime to poll it.
+2. **Your body became an `async` block** — this creates a _future_, not executed code.
+3. **A full runtime was constructed and told to `block_on`** — this is the bridge between sync and async worlds.
+
+But what _is_ that `async` block, really?
+
+## Part 2: Futures Are State Machines
+
+When you write `async { ... }`, the compiler doesn't generate a closure. It generates a **state machine**.
+
+Consider this slightly more interesting example:
+
+```rust
+async fn fetch_data() {
+    let a = step_one().await;
+    let b = step_two(a).await;
+    println!("{}", b);
+}
+```
+
+The compiler transforms this into something conceptually like:
+
+```rust
+enum FetchDataFuture {
+    Start,
+    WaitingOnStepOne { future: StepOneFuture },
+    WaitingOnStepTwo { a: Data, future: StepTwoFuture },
+    Done,
+}
+
+impl Future for FetchDataFuture {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+        loop {
+            match self.state {
+                Start => {
+                    let future = step_one();
+                    self.state = WaitingOnStepOne { future };
+                }
+                WaitingOnStepOne { ref mut future } => {
+                    match future.poll(cx) {
+                        Poll::Pending => return Poll::Pending,
+                        Poll::Ready(a) => {
+                            let future = step_two(a);
+                            self.state = WaitingOnStepTwo { a, future };
+                        }
+                    }
+                }
+                WaitingOnStepTwo { ref mut future, .. } => {
+                    match future.poll(cx) {
+                        Poll::Pending => return Poll::Pending,
+                        Poll::Ready(b) => {
+                            println!("{}", b);
+                            self.state = Done;
+                            return Poll::Ready(());
+                        }
+                    }
+                }
+                Done => panic!("polled after completion"),
+            }
+        }
+    }
+}
+```
+
+**Each `.await` point becomes a state transition.** The future remembers where it left off, yielding control when it can't make progress, resuming exactly where it stopped when polled again.
+
+This is the fundamental insight: **async Rust has no hidden control flow**. Every suspension point is explicit (`.await`), and the state machine is just data sitting on the heap (or stack, if you're careful).
+
+## Part 3: The Runtime Architecture
+
+Now we understand that your async block is just a `Future` sitting there, waiting to be polled. But who polls it? And when? And on which thread?
+
+That's the runtime's job. Let's break down `Builder::new_multi_thread().build()`:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         TOKIO RUNTIME                               │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│   ┌─────────────┐                                                   │
+│   │   DRIVER    │  ← mio-based I/O event loop                       │
+│   │  (Reactor)  │    watches file descriptors, timers               │
+│   └──────┬──────┘                                                   │
+│          │ wakes tasks when I/O ready                               │
+│          ▼                                                          │
+│   ┌─────────────────────────────────────────────────────────────┐   │
+│   │                      SCHEDULER                              │   │
+│   │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐         │   │
+│   │  │ Worker  │  │ Worker  │  │ Worker  │  │ Worker  │   ...   │   │
+│   │  │ Thread  │  │ Thread  │  │ Thread  │  │ Thread  │         │   │
+│   │  │         │  │         │  │         │  │         │         │   │
+│   │  │ [queue] │  │ [queue] │  │ [queue] │  │ [queue] │         │   │
+│   │  └────┬────┘  └────┬────┘  └────┬────┘  └────┬────┘         │   │
+│   │       └────────────┴──────┬─────┴────────────┘              │   │
+│   │                           │                                 │   │
+│   │                    ┌──────▼──────┐                          │   │
+│   │                    │   INJECT    │  ← global queue for      │   │
+│   │                    │    QUEUE    │    new/stolen tasks      │   │
+│   │                    └─────────────┘                          │   │
+│   └─────────────────────────────────────────────────────────────┘   │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### The Three Core Components
+
+**1. The Driver (I/O Reactor)**
+
+At the bottom of everything sits `mio`, a cross-platform I/O event notification library. It wraps `epoll` (Linux), `kqueue` (macOS), and `IOCP` (Windows).
+
+When your code does `socket.read().await`, here's what actually happens:
+
+- The future tries to read → gets `WouldBlock`
+- It registers interest with the reactor: "wake me when this fd is readable"
+- It returns `Poll::Pending`
+- The reactor adds this fd to its watch list
+- Eventually, `epoll_wait` returns saying the fd is ready
+- The reactor wakes the task by calling its `Waker`
+
+**2. The Worker Threads**
+
+By default, Tokio spawns one worker thread per CPU core. Each worker runs a loop that looks roughly like:
+
+```rust
+loop {
+    // 1. Check my local queue
+    if let Some(task) = self.local_queue.pop() {
+        task.poll();
+        continue;
+    }
+
+    // 2. Try to steal from others
+    if let Some(task) = self.try_steal_from_siblings() {
+        task.poll();
+        continue;
+    }
+
+    // 3. Check the global inject queue
+    if let Some(task) = self.shared.inject_queue.pop() {
+        task.poll();
+        continue;
+    }
+
+    // 4. Park and wait for I/O events
+    self.park();  // This is where epoll_wait happens
+}
+```
+
+**3. The Scheduler (Work-Stealing)**
+
+This is the secret sauce that makes Tokio fast. Let's understand why it exists.
+
+## Part 4: Work-Stealing Explained
+
+Imagine you have 4 worker threads and you spawn 100 tasks. The naive approach:
+
+```
+Global Queue: [task1, task2, task3, ... task100]
+
+Worker 1: pop → lock → pop → lock → pop → lock...
+Worker 2: pop → lock → pop → lock → pop → lock...
+Worker 3: pop → lock → pop → lock → pop → lock...
+Worker 4: pop → lock → pop → lock → pop → lock...
+```
+
+**Every pop requires a lock.** With 4 threads hammering one queue, you spend more time fighting over the lock than doing work. This is called _contention_.
+
+### The Work-Stealing Solution
+
+Give each worker its **own local queue**:
+
+```
+Worker 1: [local queue] ←── push here when spawning
+Worker 2: [local queue]
+Worker 3: [local queue]
+Worker 4: [local queue]
+
+        ↑ steal from here when empty
+```
+
+Now when Worker 1 spawns a task, it goes into Worker 1's local queue—**no lock needed** (it's a single-producer queue). Worker 1 keeps popping from its own queue, no contention.
+
+But what if Worker 1 has 50 tasks and Workers 2-4 are idle?
+
+**They steal.** Worker 2 notices its queue is empty, picks a random sibling (say, Worker 1), and steals _half_ of Worker 1's tasks. This is lock-free using atomic operations on a clever deque structure.
+
+```
+Before stealing:
+  Worker 1: [t1, t2, t3, t4, t5, t6, t7, t8]
+  Worker 2: []
+
+After Worker 2 steals:
+  Worker 1: [t1, t2, t3, t4]
+  Worker 2: [t5, t6, t7, t8]
+```
+
+Why steal half? Taking just one task would require stealing again immediately. Taking half amortizes the cost.
+
+### The Data Structure: Lock-Free Deque
+
+Tokio uses a variant of the Chase-Lev deque. The owner pushes/pops from one end (LIFO—good for cache locality), while thieves steal from the other end (FIFO—grab the oldest work):
+
+```
+          ┌───────────────────────────────┐
+          │                               │
+ OWNER    │  [t8] [t7] [t6] [t5] [t4]     │    THIEVES
+ pushes → │                          ← steal
+ pops   ← │                               │
+          │                               │
+          └───────────────────────────────┘
+                 bottom            top
+```
+
+The owner manipulates `bottom`, thieves manipulate `top`, both using atomic operations. Conflicts are rare and resolved with compare-and-swap.
+
+## Part 5: What `block_on` Actually Does
+
+Back to our expanded macro. The final piece is `runtime.block_on(body)`. This is the **bridge** between synchronous `main()` and the async world.
+
+Here's the conceptual implementation:
+
+```rust
+pub fn block_on<F: Future>(&self, future: F) -> F::Output {
+    // Pin the future (it contains self-references after first poll)
+    let mut future = pin!(future);
+
+    // Create a waker that unparks this thread
+    let waker = create_thread_waker(std::thread::current());
+    let mut cx = Context::from_waker(&waker);
+
+    loop {
+        // Try to make progress
+        match future.as_mut().poll(&mut cx) {
+            Poll::Ready(output) => return output,
+            Poll::Pending => {
+                // Future can't proceed—it's waiting on I/O or another task
+                // Park this thread until the waker is invoked
+                std::thread::park();
+            }
+        }
+    }
+}
+```
+
+The key insight: **`block_on` converts async back to sync by parking the thread when the future is pending and unparking when the waker fires.**
+
+When you call `block_on`, the calling thread (your main thread) joins the runtime temporarily. It participates in running tasks until the future you passed in completes.
+
+## Part 6: The Waker Mechanism
+
+Every future receives a `Context` containing a `Waker`. This is how the future says "I'm ready to make progress again."
+
+When your TCP socket becomes readable:
+
+1. The I/O driver's `epoll_wait` returns
+2. The driver looks up which task was waiting on that fd
+3. It calls `waker.wake()` on that task
+4. The waker schedules the task back onto a worker's queue
+5. Eventually a worker polls it again
+
+The `Waker` is just a trait object wrapping two pointers:
+
+```rust
+struct RawWaker {
+    data: *const (),           // Pointer to task metadata
+    vtable: &'static RawWakerVTable,  // Function pointers for wake/clone/drop
+}
+```
+
+When you call `waker.wake()`, it invokes the vtable's `wake` function, which in Tokio does something like:
+
+```rust
+fn wake(task: *const Task) {
+    let task = unsafe { &*task };
+
+    // Try to push to the local queue of the worker that last ran this task
+    // (task affinity helps cache locality)
+    if let Some(worker) = task.last_worker() {
+        worker.local_queue.push(task);
+        return;
+    }
+
+    // Fall back to the global inject queue
+    runtime.inject_queue.push(task);
+
+    // Signal a potentially sleeping worker
+    runtime.wake_one_worker();
+}
+```
+
+## Part 7: Putting It All Together
+
+Let's trace through a real example:
+
+```rust
+#[tokio::main]
+async fn main() {
+    let listener = TcpListener::bind("127.0.0.1:8080").await.unwrap();
+
+    loop {
+        let (socket, _) = listener.accept().await.unwrap();
+        tokio::spawn(handle_connection(socket));
+    }
+}
+```
+
+Here's the full lifecycle:
+
+```
+1. main() is called
+   └── Runtime::build() creates:
+       ├── 8 worker threads (on 8-core machine)
+       ├── 8 local work-stealing queues
+       ├── 1 global inject queue
+       └── 1 I/O driver (mio reactor)
+
+2. block_on(main_future) is called
+   └── Main thread starts polling main_future
+
+3. TcpListener::bind().await
+   └── System call to bind socket (sync, fast)
+   └── Returns immediately with listener
+
+4. listener.accept().await
+   └── No pending connection → registers with I/O driver
+   └── Returns Poll::Pending
+   └── Main thread parks, waiting for connection
+
+5. Connection arrives!
+   └── Kernel marks fd as readable
+   └── I/O driver's epoll_wait returns
+   └── Driver wakes the main future
+   └── Main future gets polled again
+   └── accept() returns the socket
+
+6. tokio::spawn(handle_connection(socket))
+   └── Creates new Task wrapping the future
+   └── Pushes to current worker's local queue
+   └── Returns immediately (spawn is not async!)
+
+7. Loop continues, goes back to accept().await
+   └── Meanwhile, spawned task gets picked up by a worker
+   └── Worker polls handle_connection future
+   └── Eventually completes, task is dropped
+
+8. This repeats forever—concurrent connection handling!
+```
+
+## Part 8: Why This Design Works
+
+The combination of work-stealing + I/O multiplexing + state-machine futures gives you:
+
+**1. Zero-cost abstractions**  
+The async state machine compiles to the same code you'd write by hand with callbacks. No heap allocations per await point, no runtime type information.
+
+**2. Scalability**  
+Work-stealing means load automatically balances. If one thread is hammered with I/O-heavy tasks while others are idle, work migrates. You don't need to tune anything.
+
+**3. Cache efficiency**  
+Tasks tend to stay on the worker that spawned them (LIFO execution from local queue). This keeps hot data in L1/L2 cache.
+
+**4. Low latency**  
+I/O events wake tasks directly via the waker mechanism. There's no polling interval or batching delay—the task runs as soon as a worker is free.
+
+**5. Minimal syscalls**  
+One `epoll_wait` can return hundreds of ready events. You batch-wake all those tasks, and workers chew through them. Compare to thread-per-connection where each connection costs a kernel thread.
+
+## The Mental Model
+
+Think of it this way:
+
+- **Your async fn** → A state machine sitting in memory
+- **`.await`** → "I can't proceed; here's how to wake me when ready"
+- **The scheduler** → A pool of workers pulling tasks from queues
+- **Work-stealing** → Load balancing by theft
+- **The driver** → The thing that actually talks to the OS about I/O
+- **Wakers** → The callbacks that push tasks back onto queues
+- **`block_on`** → "Run this future, blocking the current thread until done"
+
+That's it. Five lines of code at the top, and now you know what's beneath.
+
+## Further Reading
+
+- [Tokio internals: Understanding the runtime](https://tokio.rs/blog/2019-10-scheduler)
+- [How does async Rust work](https://bertptrs.nl/2023/04/27/how-does-async-rust-work.html)
+- [The Chase-Lev Deque](https://www.dre.vanderbilt.edu/~schmidt/PDF/work-stealing-dequeue.pdf)
+- [mio: Metal I/O](https://github.com/tokio-rs/mio)
+- [Async Rust Book](https://rust-lang.github.io/async-book/)

@@ -1,0 +1,15 @@
+---
+title: "Today I Learnt: Create named pipes with mkfifo"
+date: "2025-09-16"
+tags: ["bash", "til"]
+draft: false
+summary: "Use FIFOs to connect unrelated processes."
+---
+
+Create a named pipe and write/read from it:
+
+```bash
+mkfifo mypipe
+echo hello > mypipe &
+cat < mypipe
+```

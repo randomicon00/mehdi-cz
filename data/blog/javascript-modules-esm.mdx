@@ -1,0 +1,550 @@
+---
+title: "Today I Learnt: JavaScript Modules and ESM"
+date: "2025-09-16"
+tags: ["javascript", "es-modules", "esm", "modules", "til"]
+draft: false
+summary: "Deep dive into JavaScript ES Modules (ESM) - the modern standard for organizing and sharing code in JavaScript applications, replacing CommonJS with better static analysis and tree-shaking capabilities."
+---
+
+# Today I Learnt: JavaScript Modules and ESM
+
+JavaScript modules have evolved significantly, and ES Modules (ESM) represent the modern standard for organizing and sharing code. Understanding ESM is crucial for modern JavaScript development, offering better performance, static analysis, and developer experience compared to older module systems.
+
+## What are ES Modules?
+
+ES Modules are the official standard for JavaScript modules, providing:
+
+- Static analysis capabilities
+- Better tree-shaking for smaller bundles
+- Native browser support
+- Improved performance
+- Strict mode by default
+
+```javascript
+// math.js - Module definition
+export function add(a, b) {
+  return a + b;
+}
+
+export function multiply(a, b) {
+  return a * b;
+}
+
+export const PI = 3.14159;
+
+// app.js - Module consumption
+import { add, multiply, PI } from "./math.js";
+
+console.log(add(2, 3)); // 5
+console.log(multiply(4, 5)); // 20
+console.log(PI); // 3.14159
+```
+
+## Export Patterns
+
+### Named Exports
+
+```javascript
+// utils.js
+export function formatDate(date) {
+  return date.toLocaleDateString();
+}
+
+export function formatCurrency(amount, currency = "USD") {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+  }).format(amount);
+}
+
+export const API_BASE_URL = "https://api.example.com";
+
+export class Logger {
+  static log(message) {
+    console.log(`[${new Date().toISOString()}] ${message}`);
+  }
+}
+
+// consumer.js
+import { formatDate, formatCurrency, API_BASE_URL, Logger } from "./utils.js";
+
+console.log(formatDate(new Date()));
+console.log(formatCurrency(1234.56));
+Logger.log("Application started");
+```
+
+### Default Exports
+
+```javascript
+// User.js
+export default class User {
+  constructor(name, email) {
+    this.name = name;
+    this.email = email;
+  }
+
+  get displayName() {
+    return `${this.name} <${this.email}>`;
+  }
+}
+
+// Alternative default export syntax
+class User {
+  // ... same implementation
+}
+
+export default User;
+
+// consumer.js
+import User from './User.js';
+
+const user = new User('John Doe', 'john@example.com');
+console.log(user.displayName);
+```
+
+### Mixed Exports
+
+```javascript
+// api.js
+export const API_VERSION = "v1";
+
+export function get(endpoint) {
+  return fetch(`${API_BASE_URL}/${endpoint}`);
+}
+
+export function post(endpoint, data) {
+  return fetch(`${API_BASE_URL}/${endpoint}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
+export default {
+  version: API_VERSION,
+  get,
+  post,
+};
+
+// consumer.js
+import api, { get, post, API_VERSION } from "./api.js";
+
+// Use named exports
+get("users").then(console.log);
+
+// Use default export
+api.get("posts").then(console.log);
+```
+
+## Import Patterns
+
+### Static Imports
+
+```javascript
+// Static imports are hoisted and must be at the top
+import { readFile } from "fs/promises";
+import express from "express";
+import { z } from "zod";
+
+// Use throughout the file
+const app = express();
+
+app.get("/file/:name", async (req, res) => {
+  try {
+    const content = await readFile(req.params.name, "utf8");
+    res.send(content);
+  } catch (error) {
+    res.status(404).send("File not found");
+  }
+});
+```
+
+### Dynamic Imports
+
+```javascript
+// Dynamic imports for code splitting and lazy loading
+async function loadHeavyLibrary() {
+  try {
+    const { heavyFunction } = await import("./heavy-library.js");
+    return heavyFunction;
+  } catch (error) {
+    console.error("Failed to load library:", error);
+    return null;
+  }
+}
+
+// Conditional loading
+async function initializeApp() {
+  if (process.env.NODE_ENV === "development") {
+    const { devTools } = await import("./dev-tools.js");
+    devTools.enable();
+  }
+
+  const app = await import("./app.js");
+  app.start();
+}
+
+// Route-based code splitting in web apps
+function setupRoutes(app) {
+  app.get("/dashboard", async (req, res) => {
+    const { Dashboard } = await import("./pages/Dashboard.js");
+    res.render(Dashboard);
+  });
+
+  app.get("/admin", async (req, res) => {
+    const { AdminPanel } = await import("./pages/Admin.js");
+    res.render(AdminPanel);
+  });
+}
+```
+
+### Import Aliases
+
+```javascript
+// Renaming imports to avoid conflicts
+import { formatDate as formatDateUtil, formatCurrency as formatMoney } from "./utils.js";
+
+// Importing with different names
+import { default as React, useState as useReactState } from "react";
+
+// Namespace imports
+import * as MathUtils from "./math.js";
+
+console.log(MathUtils.add(1, 2)); // 3
+console.log(MathUtils.multiply(3, 4)); // 12
+```
+
+## Module Resolution
+
+### Relative vs Absolute Imports
+
+```javascript
+// Relative imports (from current file)
+import { User } from "./models/User.js";
+import { validate } from "../utils/validation.js";
+import { config } from "../../config/index.js";
+
+// Absolute imports (from project root)
+import { User } from "/src/models/User.js";
+import { validate } from "/src/utils/validation.js";
+import { config } from "/src/config/index.js";
+
+// Node.js style (in package.json or node)
+import express from "express";
+import { z } from "zod";
+import _ from "lodash";
+```
+
+### Path Mapping
+
+```javascript
+// tsconfig.json or package.json
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@/components/*": ["src/components/*"],
+      "@/utils/*": ["src/utils/*"]
+    }
+  }
+}
+
+// Usage with path mapping
+import { Button } from '@/components/Button';
+import { formatDate } from '@/utils/date';
+import config from '@/config';
+```
+
+## Advanced Module Patterns
+
+### Barrel Exports
+
+```javascript
+// components/index.js - Barrel export
+export { default as Button } from "./Button.js";
+export { default as Input } from "./Input.js";
+export { default as Modal } from "./Modal.js";
+export { default as Card } from "./Card.js";
+
+// Usage
+import { Button, Input, Modal, Card } from "./components";
+
+// Or namespace import
+import * as Components from "./components";
+```
+
+### Re-exports
+
+```javascript
+// lib.js - Re-exporting from multiple modules
+export { add, multiply } from "./math.js";
+export { formatDate, formatCurrency } from "./formatters.js";
+export { User } from "./models/User.js";
+
+// Selective re-export
+export { add as sum, multiply as product } from "./math.js";
+```
+
+### Conditional Exports
+
+```javascript
+// package.json
+{
+  "name": "my-library",
+  "exports": {
+    ".": {
+      "import": "./esm/index.js",
+      "require": "./cjs/index.js",
+      "types": "./types/index.d.ts"
+    },
+    "./utils": {
+      "import": "./esm/utils.js",
+      "require": "./cjs/utils.js"
+    }
+  }
+}
+
+// Usage
+import { mainFunction } from 'my-library';        // ESM version
+const { mainFunction } = require('my-library');   // CommonJS version
+import { helper } from 'my-library/utils';        // ESM utils
+```
+
+## Module Loading and Execution
+
+### Module Lifecycle
+
+```javascript
+// module.js
+console.log("Module execution starts");
+
+// Top-level await is supported in modules
+const config = await loadConfig();
+
+export const initializedData = await initializeData(config);
+
+console.log("Module execution completes");
+
+// consumer.js
+import { initializedData } from "./module.js";
+
+console.log("Consumer: Module already initialized");
+console.log(initializedData);
+```
+
+### Circular Dependencies
+
+```javascript
+// a.js
+import { bFunction } from "./b.js";
+
+export function aFunction() {
+  console.log("aFunction called");
+  bFunction();
+}
+
+// b.js
+import { aFunction } from "./a.js";
+
+export function bFunction() {
+  console.log("bFunction called");
+  // Careful: aFunction might not be fully initialized yet
+}
+
+// This can cause issues - prefer restructuring to avoid cycles
+```
+
+## Tree Shaking and Optimization
+
+### Dead Code Elimination
+
+```javascript
+// math.js
+export function add(a, b) {
+  return a + b;
+}
+export function multiply(a, b) {
+  return a * b;
+}
+export function divide(a, b) {
+  return a / b;
+}
+export function power(a, b) {
+  return Math.pow(a, b);
+}
+
+// Only 'add' and 'multiply' will be included in the bundle
+import { add, multiply } from "./math.js";
+
+// None of the functions will be included (tree shaking)
+import * as MathUtils from "./math.js";
+```
+
+### Side Effects
+
+```javascript
+// Side effect: modifies global state
+console.log('Module loaded with side effect');
+
+// Pure function (no side effects)
+export function calculateTotal(items) {
+  return items.reduce((sum, item) => sum + item.price, 0);
+}
+
+// package.json - mark modules with side effects
+{
+  "sideEffects": [
+    "./src/polyfills.js",
+    "./src/styles/*.css",
+    "*.css"
+  ]
+}
+```
+
+## Module Compatibility
+
+### ESM in Node.js
+
+```javascript
+// package.json - Enable ESM
+{
+  "type": "module"
+}
+
+// Or use .mjs extension
+// app.mjs
+
+import { readFile } from 'fs/promises';
+
+async function main() {
+  const content = await readFile('file.txt', 'utf8');
+  console.log(content);
+}
+
+main();
+```
+
+### Interoperability with CommonJS
+
+```javascript
+// CommonJS module
+function commonJSFunction() {
+  return "Hello from CommonJS";
+}
+
+module.exports = { commonJSFunction };
+
+// ESM importing CommonJS
+import { commonJSFunction } from "./commonjs-module.js";
+
+// CommonJS importing ESM (requires dynamic import)
+const esmModule = await import("./esm-module.js");
+esmModule.default();
+```
+
+## Best Practices
+
+### Module Organization
+
+```javascript
+// Good: Clear module structure
+src / components / Button.js;
+Input.js;
+index.js; // Barrel export
+utils / date.js;
+validation.js;
+index.js; // Barrel export
+services / api.js;
+auth.js;
+index.js; // Barrel export
+index.js; // Main entry point
+```
+
+### Import Order
+
+```javascript
+// Recommended import order
+// 1. Node.js built-ins
+import fs from "fs";
+import path from "path";
+
+// 2. Third-party libraries
+import React from "react";
+import express from "express";
+import _ from "lodash";
+
+// 3. Local modules
+import { User } from "./models/User.js";
+import { formatDate } from "./utils/date.js";
+import config from "./config.js";
+
+// 4. Relative imports
+import { Button } from "../components/Button.js";
+import styles from "./styles.css";
+```
+
+### Error Handling
+
+```javascript
+// Graceful degradation for optional dependencies
+let optionalLibrary;
+try {
+  optionalLibrary = await import("optional-library");
+} catch (error) {
+  console.warn("Optional library not available:", error.message);
+  optionalLibrary = { default: () => {} };
+}
+
+// Fallback for failed imports
+async function loadComponent(componentName) {
+  try {
+    const module = await import(`./components/${componentName}.js`);
+    return module.default;
+  } catch (error) {
+    console.error(`Failed to load component ${componentName}:`, error);
+    return () => <div>Component failed to load</div>;
+  }
+}
+```
+
+## Performance Considerations
+
+### Bundle Analysis
+
+```javascript
+// Analyze bundle size
+import { add } from "./math.js"; // Only includes 'add' function
+
+// vs
+import * as Math from "./math.js"; // Includes all exports
+
+// Prefer named imports for better tree shaking
+import { add, multiply } from "./math.js";
+
+// Avoid default exports for better optimization
+export { add, multiply }; // Better than export default { add, multiply }
+```
+
+### Code Splitting Strategies
+
+```javascript
+// Route-based splitting
+const routes = {
+  dashboard: () => import("./pages/Dashboard.js"),
+  admin: () => import("./pages/Admin.js"),
+  profile: () => import("./pages/Profile.js"),
+};
+
+// Feature-based splitting
+const features = {
+  charts: () => import("./features/Charts.js"),
+  calendar: () => import("./features/Calendar.js"),
+  notifications: () => import("./features/Notifications.js"),
+};
+
+// Lazy loading components
+const LazyComponent = lazy(() => import("./HeavyComponent.js"));
+```
+
+ES Modules represent the future of JavaScript module organization. They provide better performance, static analysis capabilities, and a more maintainable codebase compared to older module systems. Understanding and adopting ESM patterns is essential for modern JavaScript development.

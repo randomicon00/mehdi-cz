@@ -1,0 +1,14 @@
+---
+title: "Show last lines with tail"
+date: "2025-09-16"
+tags: ["bash", "til"]
+draft: false
+summary: "Use tail to show last lines or follow a growing file."
+---
+
+```bash
+tail -n 20 file.log
+tail -f file.log
+```
+
+Tip: `tail -F` follows even when log files are rotated.

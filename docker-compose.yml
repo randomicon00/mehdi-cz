@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  blog:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mehdi-blog
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # Load from .env file
+      - BUTTONDOWN_API_KEY=${BUTTONDOWN_API_KEY}
+      - NEXT_PUBLIC_FORMSPREE_KEY=${NEXT_PUBLIC_FORMSPREE_KEY}
+      - NEXT_UMAMI_ID=${NEXT_UMAMI_ID:-}
+      - NEXT_PUBLIC_GISCUS_REPO=${NEXT_PUBLIC_GISCUS_REPO:-}
+      - NEXT_PUBLIC_GISCUS_REPOSITORY_ID=${NEXT_PUBLIC_GISCUS_REPOSITORY_ID:-}
+      - NEXT_PUBLIC_GISCUS_CATEGORY=${NEXT_PUBLIC_GISCUS_CATEGORY:-}
+      - NEXT_PUBLIC_GISCUS_CATEGORY_ID=${NEXT_PUBLIC_GISCUS_CATEGORY_ID:-}
+      - NODE_ENV=production
+      - NEXT_TELEMETRY_DISABLED=1
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - blog-network
+
+networks:
+  blog-network:
+    driver: bridge

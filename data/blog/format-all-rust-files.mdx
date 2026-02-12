@@ -1,0 +1,22 @@
+---
+title: "Formatting All Rust Project Files"
+date: "2024-12-30"
+tags: ["rust", "formatting", "code style", "rustfmt"]
+draft: false
+summary: "Learn how to quickly format all files in a Rust project using cargo fmt, ensuring consistent code style across the entire codebase."
+---
+
+Today, I learned something simple but powerful: how to format every Rust file in a project efficiently with one command.
+Rust’s `cargo fmt` tool does the heavy lifting, applying consistent code style across the entire project.
+
+To format all files in your project, run:
+
+```bash
+cargo fmt
+```
+
+That’s it. This command formats all `.rs` files, ensuring your code follows the community's conventions. No need to worry
+about inconsistent indentation or spacing.
+
+Additionally, if you're like me and want to ensure everything is automatically formatted before committing code, you can
+add a pre-commit hook or run this as part of your CI pipeline.

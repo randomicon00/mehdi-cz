@@ -1,0 +1,132 @@
+---
+title: "How to Migrate ESLint from Version 8 to 9"
+date: "2025-01-09"
+tags: ["eslint", "migration", "javascript", "node", "linting", "best practices", "npm"]
+draft: false
+summary: Learn how to migrate your ESLint configuration from version 8 to version 9 with step-by-step instructions, updated config examples, and compatibility tips.
+---
+
+Migrating ESLint from version 8 to 9 may seem daunting, but with the right steps, it’s straightforward. This guide walks you through the migration process, updating your configuration and scripts, and ensuring your project continues to lint properly.
+
+### Why Migrate to ESLint 9?
+
+ESLint version 9 introduces performance improvements, better support for newer ECMAScript features, and enhanced developer experience. Migrating ensures that your project takes advantage of these updates, while staying up to date with the latest linting standards and compatibility fixes.
+
+### Step-by-Step Migration
+
+#### 1. Migrate the Configuration
+
+Start by using the @eslint/migrate-config utility to convert your existing .eslintrc.json configuration file to the new format.
+
+Run the following command:
+
+```bash
+npx @eslint/migrate-config .eslintrc.json
+```
+
+You may see the following message:
+
+```text
+Migrating .eslintrc.json
+
+Wrote new config to ./eslint.config.mjs
+
+You will need to install the following packages to use the new config:
+- globals
+- @eslint/js
+- @eslint/eslintrc
+```
+
+Now, install the required dependencies:
+
+```bash
+npm install globals @eslint/js @eslint/eslintrc -D
+```
+
+Finally, remove the old configuration file:
+
+```bash
+rm .eslintrc.json
+```
+
+#### 2. Update the Ignore Rules
+
+To ensure your linting process ignores specific directories (such as `dist` or `node_modules`), you need to install the compatibility utility and update your `eslint.config.mjs`.
+
+First, install the ESLint compatibility utilities:
+
+```bash
+npm install @eslint/compat -D
+```
+
+Then, update your `eslint.config.mjs` file to include the `.gitignore` or any custom ignore files:
+
+```javascript
+import { includeIgnoreFile } from "@eslint/compat";
+import path from "path";
+
+const gitignorePath = path.resolve(__dirname, ".gitignore");
+
+export default [
+  includeIgnoreFile(gitignorePath),
+  // other configurations...
+];
+```
+
+If you want to ignore specific directories (e.g., dist), you can modify the configuration like this:
+
+```javascript
+export default [
+  {
+    ignores: ["dist/"],
+  },
+  // other configurations...
+];
+```
+
+#### 3. Run the ESLint Script
+
+Once you’ve updated the configuration, run the ESLint command to ensure everything works as expected:
+
+```bash
+npx eslint .
+```
+
+If you have linting scripts in your `package.json`, ensure they are up to date:
+
+```json
+"scripts": {
+  "lint": "eslint ."
+}
+```
+
+#### 4. Test the Migration
+
+At this point, your migration should be complete. Test your setup by running your linting commands on your project files. If you encounter any issues, double-check the config file for missing rules or dependencies.
+
+### Example Use Case: Migrating an HTML-React Project
+
+Here’s an example of how you might structure your `eslint.config.mjs` for a project using `html-react-parser`:
+
+```javascript
+import { includeIgnoreFile } from "@eslint/compat";
+import path from "path";
+
+const gitignorePath = path.resolve(__dirname, ".gitignore");
+
+export default [
+  includeIgnoreFile(gitignorePath),
+  {
+    ignores: ["dist/", "node_modules/"],
+  },
+  // Additional project-specific configurations
+];
+```
+
+By ensuring all your project-specific directories are ignored and required dependencies are in place, you can successfully migrate to ESLint 9 with minimal friction.
+
+### Conclusion
+
+Migrating ESLint from version 8 to 9 is a straightforward process when broken down into clear steps. It starts with updating your configuration, installing the necessary dependencies, and adjusting any ignore rules. By following these instructions, you can ensure a smooth transition to ESLint 9 while maintaining the linting integrity of your project.
+
+Staying up to date with the latest versions of tools like ESLint helps keep your codebase clean, efficient, and in line with current best practices.

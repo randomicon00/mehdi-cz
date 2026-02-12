@@ -1,0 +1,123 @@
+---
+title: "How to Implement a Trait You Don't Own for a Type You Don't Own in Rust"
+date: "2025-01-27"
+tags: ["rust", "traits", "orphan rule", "newtype pattern", "rust programming"]
+draft: false
+summary: This article explores the orphan rule in Rust and provides a practical workaround using the newtype pattern to implement traits you don't own for types you also don't own, ensuring code coherence and maintainability.
+---
+
+# How to Implement a Trait You Don't Own for a Type You Don't Own in Rust
+
+In Rust, you might find yourself wanting to implement a trait you don’t own for a type you also don’t own. For instance, consider implementing the `Shl` trait for the `Vec` type, so that expressions like `vec << 4` become syntactic sugar for `vec.push(4)`. Let's see why this is problematic and explore alternative approaches.
+
+## The Problem: Orphan Rule
+
+The Rust compiler enforces what's called the **orphan rule**. This rule prohibits you from implementing a trait for a type unless either the trait or the type is defined within your crate. If both the type and the trait are defined elsewhere (e.g., in the standard library or a third-party crate), you cannot directly implement them for each other.
+
+This restriction exists for **trait coherence**, which ensures that there are no conflicting implementations of a trait for a given type. For example, imagine two different crates each trying to implement the same trait for the same type—this would create ambiguity and inconsistencies.
+
+## Example Scenario: The Compilation Error
+
+Attempting to implement `Shl` for `Vec` would look something like this:
+
+```rust
+use std::ops::Shl;
+
+impl<T> Shl<T> for Vec<T> {
+    type Output = Vec<T>;
+
+    fn shl(mut self, elem: T) -> Vec<T> {
+        self.push(elem);
+        self
+    }
+}
+
+fn main() {
+    let v = vec![1, 2, 3];
+    let v = v << 4;
+}
+```
+
+Compiling this code results in the following error:
+
+```
+cannot provide an extension implementation where both trait and type are not defined in this crate [E0117]
+```
+
+This is the compiler enforcing the orphan rule. The `Vec` type is defined in the standard library, and so is the `Shl` trait. Since you own neither, you cannot implement one for the other.
+
+## Workaround: The Newtype Pattern
+
+The most common way to get around this limitation is the **newtype pattern**. The idea is to create a wrapper type for the type you don’t own, and then implement the desired trait on that wrapper.
+
+Here’s how you could implement the `Shl` trait for a new wrapper around `Vec`:
+
+```rust
+use std::ops::Shl;
+
+struct MyVec<T>(Vec<T>);
+
+impl<T> Shl<T> for MyVec<T> {
+    type Output = MyVec<T>;
+
+    fn shl(mut self, elem: T) -> Self::Output {
+        self.0.push(elem);
+        self
+    }
+}
+
+fn main() {
+    let mut v = MyVec(vec![1, 2, 3]);
+    v = v << 4;
+    assert_eq!(v.0, vec![1, 2, 3, 4]);
+}
+```
+
+### Adding Deref for Convenience
+
+The wrapper type can be inconvenient to use since you have to access the underlying value manually (e.g., `v.0`). To make it more ergonomic, you can implement the `Deref` and `DerefMut` traits:
+
+```rust
+use std::ops::{Deref, DerefMut};
+
+impl<T> Deref for MyVec<T> {
+    type Target = Vec<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<T> DerefMut for MyVec<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+```
+
+Now, you can call methods on `Vec` directly from `MyVec`:
+
+```rust
+fn main() {
+    let mut v = MyVec(vec![1, 2, 3]);
+    v = v << 4;
+    v.truncate(2);
+    assert_eq!(v.len(), 2);
+}
+```
+
+### When to Avoid Operator Overloading
+
+While operator overloading can be a powerful tool, it's generally best to avoid overloading operators with unexpected semantics. For example, overloading `<<` to mean "push to a vector" might be surprising to someone reading the code. Instead, providing a well-named method like `push_elem` might be a clearer and more maintainable choice.
+
+## Why the Orphan Rule Matters
+
+The orphan rule plays a significant role in ensuring **trait coherence**. If Rust allowed arbitrary implementations, different crates could provide conflicting implementations of the same trait for the same type, which would make the behavior of programs unpredictable. The newtype pattern offers a simple and clear workaround to extend the functionality of types you don’t own.
+
+## Conclusion
+
+- In Rust, the **orphan rule** prevents implementing a trait you don’t own for a type you don’t own, ensuring coherence and avoiding conflicts.
+- The **newtype pattern** is a common workaround, where you wrap the type you don't own in a new struct and implement the desired trait on that wrapper.
+- Adding **Deref** and **DerefMut** implementations can make the newtype easier to use by providing convenient access to the underlying type.
+- Be cautious with **operator overloading**, as unexpected semantics can make code harder to understand and maintain.
+- Understanding and adhering to the orphan rule helps maintain **predictable and maintainable code** in Rust.

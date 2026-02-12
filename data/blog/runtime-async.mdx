@@ -1,0 +1,77 @@
+---
+title: "Understanding Tokio Task Functions"
+date: "2024-10-23"
+tags: ["rust", "tokio", "async", "concurrency", "spawn", "spawn_blocking", "block_on"]
+draft: false
+summary: Explore how Tokio's spawn, spawn_blocking, and block_on functions allow efficient handling of asynchronous, blocking, and CPU-heavy tasks in Rust applications, with practical use cases for each.
+---
+
+Let's break down and compare the three functions you mentioned from Tokio's runtime:
+
+## spawn
+
+Spawns a non-blocking future on the Tokio runtime, which will run on a thread pool. It is for tasks that are async and should run concurrently without blocking the thread.
+Use Case: Use this for lightweight async tasks, such as networking or I/O-bound operations that don't require heavy CPU work.
+
+```rust
+use tokio::runtime::Runtime;
+
+// Create the runtime
+let rt = Runtime::new().unwrap();
+let handle = rt.handle();
+
+// Spawn a non-blocking async task
+handle.spawn(async {
+    println!("This is running on a worker thread.");
+});
+// The spawned task runs independently in the background, even if we don't await it.
+```
+
+Real-Life Example: You could use this to handle concurrent HTTP requests in a web server without blocking the main thread.
+
+## spawn_blocking
+
+Spawns a blocking task onto a dedicated thread pool for blocking operations. This is used for CPU-heavy or blocking tasks that would otherwise prevent the runtime from making progress.
+Use Case: Use this for CPU-bound tasks or blocking I/O (e.g., file system operations or cryptographic calculations).
+
+```rust
+use tokio::runtime::Runtime;
+
+let rt = Runtime::new().unwrap();
+let handle = rt.handle();
+
+// Spawn a CPU-heavy/blocking task
+handle.spawn_blocking(|| {
+    println!("This is running on a dedicated blocking thread.");
+    // Simulating a blocking operation like heavy computation or disk I/O
+});
+```
+
+Real-Life Example: This would be suitable for tasks like image processing, compressing files, or other CPU-intensive computations that would otherwise block async tasks.
+
+## block_on
+
+Runs a future to completion on the current thread, blocking the thread until the future is resolved. It is useful when you need to run async code synchronously in certain contexts (e.g., within a sync function).
+Use Case: Use this when you need to run an async task synchronously in a blocking manner, often in environments where you cannot use async/await directly (such as within main() in some situations).
+
+```rust
+Copy code
+use tokio::runtime::Runtime;
+
+let rt = Runtime::new().unwrap();
+let handle = rt.handle();
+
+// Block the current thread until the future completes
+handle.block_on(async {
+    println!("Running async task synchronously.");
+});
+```
+
+Real-Life Example: This can be useful in scenarios where you need to run async code in a non-async context, like starting an async task in a unit test or a CLI tool that doesn't support async functions.
+
+## Comparison Summary
+
+- **spawn**: For non-blocking, lightweight async tasks (e.g., I/O-bound).
+- **spawn_blocking**: For CPU-heavy or blocking tasks that would slow down the runtime (e.g., file processing, cryptography).
+- **block_on**: For running async code synchronously (blocking the current thread until it completes). Useful in cases where async-await cannot be directly used.
+  These tools help manage asynchronous tasks efficiently in Rust, enabling fine control over I/O-heavy, CPU-heavy, and mixed workloads in a concurrent runtime like Tokio.

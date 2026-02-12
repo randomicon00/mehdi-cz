@@ -1,0 +1,270 @@
+---
+title: "Everything I've Learnt about Reflect in JavaScript"
+date: "2024-09-30"
+tags: ["javascript", "reflect", "meta-programming", "decorators"]
+draft: false
+summary: "A brief overview of JavaScript's Reflect API with practical examples of how it aids meta-programming by providing methods for intercepting operations on objects."
+---
+
+Reflect in JavaScript is an API that provides methods for intercepting and performing operations on objects.
+It is often used in combination with proxies and decorators for meta-programming.
+
+## Reflect Basics
+
+Reflect simplifies and standardizes common object operations, like defining properties or applying functions.
+
+```js
+// Reflect.set sets a property on an object
+const obj = { a: 1 };
+Reflect.set(obj, "b", 2);
+console.log(obj); // { a: 1, b: 2 }
+```
+
+## Reflect vs. Object Methods
+
+Reflect methods are designed to be consistent and return `true`/`false` indicating success, unlike their Object counterparts which may throw errors.
+
+```js
+// Using Object.defineProperty
+const obj1 = {};
+try {
+  Object.defineProperty(obj1, "a", { value: 1, writable: false });
+  console.log(obj1.a); // 1
+
+  // Trying to redefine the property will throw an error
+  Object.defineProperty(obj1, "a", { value: 2 });
+} catch (error) {
+  console.error("Object.defineProperty error:", error.message); // Error: Cannot redefine property: a
+}
+
+// Using Reflect.defineProperty
+const obj2 = {};
+const success = Reflect.defineProperty(obj2, "b", { value: 2, writable: false });
+console.log(success); // true
+console.log(obj2.b); // 2
+
+// Reflect returns false instead of throwing an error
+const redefineSuccess = Reflect.defineProperty(obj2, "b", { value: 3 });
+console.log(redefineSuccess); // false
+console.log(obj2.b); // 2 (value doesn't change)
+```
+
+In summary, `Object.defineProperty` throws an error when it fails, while `Reflect.defineProperty` returns `false`, providing more control in certain scenarios.
+
+## Reflect with Function Invocation
+
+You can use Reflect.apply to invoke a function with a specified `this` context and arguments.
+
+```js
+function sum(a, b) {
+  return a + b;
+}
+
+const result = Reflect.apply(sum, null, [5, 10]);
+console.log(result); // 15
+```
+
+## Reflect with Proxies
+
+Reflect works well with proxies by allowing you to control fundamental operations on objects.
+
+```js
+const handler = {
+  get(target, prop, receiver) {
+    console.log(`Accessing ${prop}`);
+    return Reflect.get(target, prop, receiver);
+  },
+};
+
+const proxy = new Proxy({ x: 10 }, handler);
+console.log(proxy.x); // Logs: Accessing x, then returns 10
+```
+
+This example demonstrates how to intercept property access using a Proxy and Reflect.get.
+
+1. **Handler Object**: The handler defines a get trap, which intercepts property access on the target object.
+2. **Proxy Object**: The proxy wraps the target `{ x: 10 }` using the handler.
+3. **Access Interception**: When `proxy.x` is accessed, the get trap runs:
+   - Logs the access: Accessing x
+   - Uses `Reflect.get` to retrieve the actual value (10), preserving default behavior.
+
+This allows you to add custom logic (e.g., logging) while still correctly handling property access.
+
+## Reflect and Metadata
+
+Reflect is also essential in storing and retrieving metadata, useful in decorators and meta-programming.
+
+```js
+// Set metadata on a target
+Reflect.defineMetadata("role", "admin", obj);
+
+// Retrieve metadata
+const role = Reflect.getMetadata("role", obj);
+console.log(role); // 'admin'
+```
+
+## Reflect in Class Creation
+
+Reflect can also be used to construct classes dynamically, replacing new with Reflect.construct.
+
+```js
+Copy code
+class MyClass {
+  constructor(name) {
+    this.name = name;
+  }
+}
+const instance = Reflect.construct(MyClass, ['John']);
+console.log(instance.name); // 'John'
+```
+
+Reflect standardizes operations on objects, offering more predictable behavior than traditional methods. It works well with proxies and decorators to enable more flexible meta-programming.
+
+## Faq
+
+### 1) Difference Proxy Constructor and Reflect
+
+Proxy allows custom behavior for fundamental operations on objects like property lookup and assignment. Reflect provides methods that directly perform these operations, matching Proxy traps but offering simpler calls without wrapping the object.
+
+```js
+const target = { a: 1 };
+const proxy = new Proxy(target, {
+  get: (t, prop) => Reflect.get(t, prop, target),
+});
+console.log(proxy.a); // 1
+```
+
+### 2) Is it better to use `Reflect.defineProperty` instead of `Object.defineProperty`?
+
+`Reflect.defineProperty` returns a boolean indicating success, while `Object.defineProperty` throws an error if the operation fails. Reflect is useful when you don't want to handle exceptions with try/catch.
+
+```js
+let obj = {};
+let success = Reflect.defineProperty(obj, "key", { value: 42 });
+console.log(success); // true
+```
+
+### 3) `Reflect.construct` vs `new`
+
+`Reflect.construct` allows you to specify the prototype and `newTarget`, giving it flexibility over the `new` keyword for advanced object construction scenarios.
+
+```js
+Copy code
+class Foo {
+  constructor() { console.log('Foo instance created'); }
+}
+
+let instance = Reflect.construct(Foo, []);
+// Equivalent to `new Foo()`
+```
+
+### 4) Instantiating objects dynamically
+
+You can instantiate objects using Reflect.construct with dynamic arguments and constructors, similar to the apply method for functions.
+
+```js
+const dateArgs = [2024, 9, 27];
+const date = Reflect.construct(Date, dateArgs);
+console.log(date); // Sat Sep 27 2024 ...
+```
+
+### 5) Can you intercept object methods without modifying the object itself?
+
+Yes, you can use a Proxy to intercept method calls without modifying the original object by intercepting the get operation.
+
+```js
+function intercept(obj) {
+  return new Proxy(obj, {
+    get(target, prop) {
+      if (typeof target[prop] === "function") {
+        return (...args) => {
+          console.log(`Calling ${prop}`);
+          return Reflect.apply(target[prop], target, args);
+        };
+      }
+      return target[prop];
+    },
+  });
+}
+
+const obj = {
+  foo() {
+    return "foo";
+  },
+};
+
+const intercepted = intercept(obj);
+console.log(intercepted.foo()); // Logs 'Calling foo', returns 'foo'
+```
+
+### 6) What Happens When You Don't Use `Reflect.get`?
+
+If you don’t use Reflect in the proxy handler, the behavior of your proxy could change depending on how you access the properties. Let’s walk through what happens:
+
+#### Without Reflect.get:
+
+When you don’t use `Reflect.get`, and instead directly access the property like `target[prop]`, you might lose certain benefits of using proxies—especially when dealing with prototypes and inheritance.
+
+Here’s an example:
+
+```js
+const handler = {
+  get(target, prop) {
+    console.log(`Accessing ${prop}`);
+    return target[prop]; // Directly accessing the target property
+  },
+};
+
+const proxy = new Proxy({ x: 10 }, handler);
+console.log(proxy.x); // Logs: Accessing x, then returns 10
+```
+
+In this case, the property `x` is accessed directly from the target object without going through `Reflect.get`. For simple cases, this works the same.
+
+### Issues Without `Reflect.get`:
+
+1. Incorrect `this` binding (especially in inherited objects):
+
+   - When dealing with getter methods, `Reflect.get` ensures that the `this` value is correctly bound to the right object (i.e., the receiver). Without `Reflect.get`, the `this` context can get lost.
+
+2. Prototype chain behavior:
+
+   - If the proxy object is used as a prototype or there’s inheritance involved, directly accessing `target[prop]` doesn’t handle the case where the property exists on the prototype chain. `Reflect.get` ensures that the correct value is retrieved from the prototype chain when needed.
+
+#### Example with `this` context issue:
+
+```js
+const obj = {
+  _name: "Guest",
+  get name() {
+    return this._name;
+  },
+};
+
+const proxy = new Proxy(obj, {
+  get(target, prop, receiver) {
+    return target[prop]; // Direct access without Reflect
+  },
+});
+
+const admin = Object.create(proxy);
+admin._name = "Admin";
+
+console.log(admin.name); // Logs "Guest" instead of "Admin"
+```
+
+In this case, `admin.name` should ideally return "Admin" because `_name` was set to "Admin" on `admin`. However, because we directly accessed `target[prop]`, it returns "Guest"—the value from the proxy's target object.
+
+#### Fixing the Issue with `Reflect.get`:
+
+```js
+const proxy = new Proxy(obj, {
+  get(target, prop, receiver) {
+    return Reflect.get(target, prop, receiver); // Correct access
+  },
+});
+
+console.log(admin.name); // Logs "Admin" as expected
+```
+
+Here, `Reflect.get` ensures that the `this` context (in this case, the `receiver`, which is `admin`) is preserved correctly. So, the getter for `name` works as expected and returns "Admin" instead of "Guest".

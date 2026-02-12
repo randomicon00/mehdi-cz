@@ -1,0 +1,98 @@
+---
+title: "Exploring LeetCode's Most Obscure Problems: Two Sum (Revisited)"
+date: "2024-12-19"
+tags: ["algorithms", "data structures", "hash table", "leetcode"]
+draft: false
+summary: An in-depth analysis of LeetCode's 'Two Sum' problem, exploring lesser-known optimizations and alternative approaches.
+---
+
+### Introduction
+
+LeetCode’s "Two Sum" (Problem #1) is often considered a beginner-level problem, but its simplicity hides the complexity of optimized solutions and real-world applications. In this article, we go beyond the brute-force solution and explore efficient and obscure approaches to solving it.
+
+### Problem Statement
+
+Given an array of integers `nums` and an integer `target`, return the indices of the two numbers that add up to `target`.
+
+**Example:**
+
+```python
+Input: nums = [2,7,11,15], target = 9
+Output: [0,1]  # Because nums[0] + nums[1] == 9
+```
+
+### Common Approaches
+
+#### 1. Brute Force (O(n²))
+
+```python
+def two_sum_brute_force(nums, target):
+    for i in range(len(nums)):
+        for j in range(i + 1, len(nums)):
+            if nums[i] + nums[j] == target:
+                return [i, j]
+    return []
+```
+
+This approach checks every possible pair, resulting in an inefficient `O(n²)` time complexity.
+
+#### 2. Hash Map Optimization (O(n))
+
+```python
+def two_sum_hash_map(nums, target):
+    num_map = {}
+    for i, num in enumerate(nums):
+        complement = target - num
+        if complement in num_map:
+            return [num_map[complement], i]
+        num_map[num] = i
+    return []
+```
+
+This approach reduces the time complexity to `O(n)` by leveraging a hash table for constant-time lookups.
+
+### Obscure Approaches
+
+#### 3. Sorting + Two-Pointer (O(n log n))
+
+If indices aren’t required, we can use sorting and a two-pointer technique:
+
+```python
+def two_sum_sorted(nums, target):
+    sorted_nums = sorted((num, i) for i, num in enumerate(nums))
+    left, right = 0, len(sorted_nums) - 1
+    while left < right:
+        current_sum = sorted_nums[left][0] + sorted_nums[right][0]
+        if current_sum == target:
+            return [sorted_nums[left][1], sorted_nums[right][1]]
+        elif current_sum < target:
+            left += 1
+        else:
+            right -= 1
+    return []
+```
+
+This approach sorts the array first (`O(n log n)`) and then uses a two-pointer technique (`O(n)`).
+
+#### 4. Using XOR for Memory-Efficient Lookup
+
+```python
+def two_sum_xor(nums, target):
+    num_set = set()
+    for num in nums:
+        if target ^ num in num_set:
+            return [nums.index(target ^ num), nums.index(num)]
+        num_set.add(num)
+    return []
+```
+
+This method exploits XOR properties to find pairs efficiently, although it has limitations in handling duplicate numbers.
+
+### Conclusion
+
+- **Brute Force (`O(n²)`)**: Works but inefficient for large inputs.
+- **Hash Table (`O(n)`)**: Optimal solution with a space-time tradeoff.
+- **Sorting + Two Pointers (`O(n log n)`)**: Viable if index order isn’t required.
+- **XOR (`O(n)`)**: A unique, memory-efficient alternative.
+
+Understanding these different approaches not only helps in solving "Two Sum" but also builds a strong foundation for tackling similar algorithmic problems efficiently.

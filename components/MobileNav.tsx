@@ -1,30 +1,32 @@
-'use client'
+"use client";
 
-import { Dialog, Transition } from '@headlessui/react'
-import { disableBodyScroll, enableBodyScroll, clearAllBodyScrollLocks } from 'body-scroll-lock'
-import { Fragment, useState, useEffect, useRef } from 'react'
-import Link from './Link'
-import headerNavLinks from '@/data/headerNavLinks'
+import { Dialog, Transition } from "@headlessui/react";
+import { disableBodyScroll, enableBodyScroll, clearAllBodyScrollLocks } from "body-scroll-lock";
+import { Fragment, useState, useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
+import Link from "./Link";
+import headerNavLinks from "@/data/headerNavLinks";
 
 const MobileNav = () => {
-  const [navShow, setNavShow] = useState(false)
-  const navRef = useRef(null)
+  const [navShow, setNavShow] = useState(false);
+  const navRef = useRef(null);
+  const pathname = usePathname();
 
   const onToggleNav = () => {
     setNavShow((status) => {
       if (status) {
-        enableBodyScroll(navRef.current)
+        enableBodyScroll(navRef.current);
       } else {
         // Prevent scrolling
-        disableBodyScroll(navRef.current)
+        disableBodyScroll(navRef.current);
       }
-      return !status
-    })
-  }
+      return !status;
+    });
+  };
 
   useEffect(() => {
-    return clearAllBodyScrollLocks
-  })
+    return clearAllBodyScrollLocks;
+  });
 
   return (
     <>
@@ -72,16 +74,27 @@ const MobileNav = () => {
                 ref={navRef}
                 className="mt-8 flex h-full basis-0 flex-col items-start overflow-y-auto pl-12 pt-2 text-left"
               >
-                {headerNavLinks.map((link) => (
-                  <Link
-                    key={link.title}
-                    href={link.href}
-                    className="mb-4 py-2 pr-4 text-2xl font-bold tracking-widest text-gray-900 outline outline-0 hover:text-primary-500 dark:text-gray-100 dark:hover:text-primary-400"
-                    onClick={onToggleNav}
-                  >
-                    {link.title}
-                  </Link>
-                ))}
+                {headerNavLinks.map((link) => {
+                  const isActive = pathname === link.href || pathname.startsWith(link.href + "/");
+                  const isHire = link.href === "/hire";
+
+                  return (
+                    <Link
+                      key={link.title}
+                      href={link.href}
+                      className={`mb-4 py-2 pr-4 text-2xl font-bold tracking-widest outline outline-0 hover:text-primary-500 dark:hover:text-primary-400 ${
+                        isHire
+                          ? `font-extrabold text-green-600 dark:text-green-400 ${isActive ? "border-l-4 border-green-600 pl-8 dark:border-green-400" : ""}`
+                          : isActive
+                            ? "border-l-4 border-primary-500 pl-8 text-primary-500 dark:border-primary-400 dark:text-primary-400"
+                            : "text-gray-900 dark:text-gray-100"
+                      }`}
+                      onClick={onToggleNav}
+                    >
+                      {link.title}
+                    </Link>
+                  );
+                })}
               </nav>
 
               <button
@@ -102,7 +115,7 @@ const MobileNav = () => {
         </Dialog>
       </Transition>
     </>
-  )
-}
+  );
+};
 
-export default MobileNav
+export default MobileNav;

@@ -1,0 +1,51 @@
+---
+title: "Working with React Component Props in TypeScript"
+date: "2025-01-22"
+tags: ["typescript", "react", "component props", "typescript utilities", "best practices"]
+draft: false
+summary: Learn how to work with React component props in TypeScript using the ComponentProps utility to streamline prop handling, even when the prop type isn't exported.
+---
+
+When building React components in TypeScript, dealing with component props is a common task. But what happens when the prop type of a component isn't exported? Fortunately, TypeScript provides a handy utility called `ComponentProps` that simplifies prop handling without the need to manually define or export prop types. This utility can be a game-changer when you're working with components whose props aren’t explicitly defined or exported.
+
+### The Scenario
+
+Let’s say you have a React component, but the prop types are not exported. Here’s a typical situation:
+
+```tsx
+Copy code
+import { MyComponent } from './MyComponent';
+
+type Props = {};
+```
+
+At this point, you might need to define or reuse the prop types of `MyComponent`. Instead of manually recreating the prop types, you can use TypeScript's `ComponentProps` utility to automatically infer the types.
+
+### Using ComponentProps
+
+TypeScript's `ComponentProps` allows you to extract the props of a given component. Here's how you can use it:
+
+```tsx
+import type { ComponentProps } from "react";
+import { MyComponent } from "./MyComponent";
+
+type Props = ComponentProps<typeof MyComponent>;
+```
+
+This type will now hold the same structure as `MyComponent`'s props. It's a powerful way to reuse prop definitions across different components without having to manually export or redefine them.
+
+### The Single-Liner
+
+For those who prefer concise code, here's the same solution in a single line:
+
+```tsx
+type Props = React.ComponentProps<typeof MyComponent>;
+```
+
+With this, you can access all the props of `MyComponent` without having to explicitly define or export them, making your code cleaner and more maintainable.
+
+### Why Use `ComponentProps`?
+
+1. **DRY Principle**: Don’t repeat yourself! Avoid redefining prop types that already exist.
+2. **Type Safety**: By inferring the types directly from the component, you ensure type safety and consistency across your application.
+3. **Maintainability**: If `MyComponent`'s prop types change, the `ComponentProps` type will automatically update, reducing the chance of mismatched types.

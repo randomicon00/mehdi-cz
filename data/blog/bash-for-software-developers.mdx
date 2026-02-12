@@ -1,0 +1,188 @@
+---
+title: "Essential Bash Crash Course for Software Engineers"
+date: "2024-11-02"
+tags: ["bash", "shell", "linux", "automation", "scripts"]
+draft: false
+summary: A quick, practical crash course on essential Bash scripting constructs for software engineers who need to automate workflows and become more proficient in shell scripting.
+---
+
+Bash is a powerful scripting language essential for automating tasks in Linux. This crash course covers the core elements that every software engineer should know to become effective at Bash scripting.
+
+## Basics of Bash
+
+### Variables
+
+```bash
+name="Alice"
+echo "Hello, $name"
+```
+
+- Variables in bash are defined without `=` spaces.
+- Use `$` to reference a variable.
+
+### Conditional Statements
+
+```bash
+if [ "$name" == "Alice" ]; then
+  echo "Hello, Alice!"
+else
+  echo "You are not Alice."
+fi
+```
+
+- `[ ... ]` is used to test conditions.
+- `==` compares strings, `-eq` is for integers.
+
+### Loops
+
+- **For Loop**
+  ```bash
+  for i in {1..5}; do
+    echo "Iteration: $i"
+  done
+  ```
+  Loops over a sequence of numbers or list of strings.
+- **While Loop**
+  ```bash
+  count=0
+  while [ $count -lt 3 ]; do
+    echo "Count is: $count"
+    count=$((count+1))
+  done
+  ```
+
+### Functions
+
+```bash
+function greet() {
+  local name="$1"
+  echo "Hello, $name!"
+}
+greet "Bob"
+```
+
+- Use `function` keyword (optional) and `local` for scope isolation.
+- Call with `greet "argument"`.
+
+### File Operations
+
+- **Redirect Output**
+  ```bash
+  echo "Hello World" > output.txt
+  ```
+  `>` writes (overwrites), `>>` appends.
+- **Read File Line by Line**
+  ```bash
+  while read -r line; do
+    echo "Line: $line"
+  done < input.txt
+  ```
+
+### Command Substitution
+
+```bash
+current_date=$(date)
+echo "Today's date is $current_date"
+```
+
+- Wrap a command in `$(...)` to assign its output to a variable.
+
+## Control Operators
+
+- **AND (`&&`) and OR (`||`)**
+  ```bash
+  mkdir my_folder && echo "Folder created"
+  ```
+  Executes second command only if the first succeeds.
+- **Pipes (`|`)**
+  ```bash
+  cat file.txt | grep "search_term"
+  ```
+  Passes the output of one command to another.
+
+## Wildcards & Globbing
+
+```bash
+echo *.txt  # Lists all files ending with .txt
+```
+
+- `*` matches zero or more characters, `?` matches exactly one.
+
+## Debugging Scripts
+
+- **Run with Debug Mode**
+  ```bash
+  bash -x script.sh
+  ```
+  Enables debug output for step-by-step tracing.
+
+## Practical Tips
+
+- **Environment Variables**: Use `$HOME` or `$USER` for user-specific paths.
+- **Shebang (`#!`)**: Always start your script with `#!/bin/bash` to specify the interpreter.
+- **Exit Codes**: Use `$?` to get the status of the last command executed.
+
+### Example Script: File Backup
+
+```bash
+#!/bin/bash
+src_folder="/path/to/source"
+dest_folder="/path/to/backup"
+date=$(date +%Y-%m-%d)
+backup_file="$dest_folder/backup-$date.tar.gz"
+
+tar -czf "$backup_file" "$src_folder" && echo "Backup successful: $backup_file"
+```
+
+- Create a compressed backup using `tar`.
+- `&&` ensures echo runs only on success.
+
+## FAQ
+
+1. **How do you run a bash script?**
+
+   - Use `./script.sh` after making it executable (`chmod +x script.sh`).
+
+2. **What's the difference between `[ ... ]` and `[[ ... ]]`?**
+
+   - `[[ ... ]]` supports more complex expressions and is safer for string comparisons.
+
+3. **How do you pass arguments to a script?**
+
+   - Use `$1`, `$2`, etc., for positional arguments (`script.sh arg1 arg2`).
+
+4. **How do you check if a file exists?**
+
+   ```bash
+   if [ -f "filename.txt" ]; then echo "File exists."; fi
+   ```
+
+5. **What is `#!/bin/bash`?**
+
+   - It specifies the interpreter used to execute the script.
+
+6. **How do you set a variable as read-only?**
+
+   ```bash
+   readonly my_var="value"
+   ```
+
+7. **How do you loop through files in a directory?**
+
+   ```bash
+   for file in /path/to/dir/*; do echo "File: $file"; done
+   ```
+
+8. **How can you handle errors in bash?**
+
+   - Use `set -e` to exit the script when any command fails.
+
+9. **How do you create an alias?**
+
+   - `alias ll='ls -la'` for convenient command shortcuts.
+
+10. **How do you declare arrays in bash?**
+    ```bash
+    my_array=("item1" "item2" "item3")
+    echo "First item: ${my_array[0]}"
+    ```

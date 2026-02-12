@@ -1,0 +1,41 @@
+---
+title: "Today I Learned: The Intricacies of HTTP Cache Control Directives"
+date: "2025-01-07"
+tags: ["HTTP", "Caching", "Web Development", "Today I Learned"]
+draft: false
+summary: Understanding HTTP cache control directives can be complex, even for experienced engineers. Here’s a look at some common pitfalls and examples.
+---
+
+Today I learned that, despite their simplicity on the surface, HTTP cache control directives can be pretty intricate. You’d think adding a `Cache-Control` header would be straightforward—just throw in some `max-age` or `public`, and you’re set, right? But no, these headers have nuances that even experienced engineers can trip over.
+
+Here are a couple of things that caught me off guard:
+
+### Example1: `public`, `no-store`, and `max-age`
+
+Imagine you’re setting up a cache and want it fresh for an hour. Here’s what you might start with:
+
+```text
+Cache-Control: public, max-age=3600
+```
+
+This caches the response publicly, meaning it’s okay for CDNs or proxies to store it, and it’s fresh for one hour. But what happens if we add `no-store`?
+
+```text
+Cache-Control: public, max-age=3600, no-store
+```
+
+Here’s the twist: adding `no-store` overrides everything else—it tells the cache not to store anything, regardless of max-age. It’s easy to see how small adjustments in cache control settings can dramatically change behavior.
+
+### Example 2: Combining must-revalidate and stale-while-revalidate
+
+For more intricate control, you might try combining `must-revalidate` and `stale-while-revalidate` like this:
+
+```text
+Cache-Control: public, max-age=300, stale-while-revalidate=120, must-revalidate
+```
+
+Breaking it down:
+
+- `max-age=300`: Keeps the cache fresh for 5 minutes.
+- `stale-while-revalidate=120`: After 5 minutes, serves stale content while a fresh copy is validated in the background for up to 2 minutes.
+- `must-revalidate`: Forces the cache to validate with the origin server once it’s stale.

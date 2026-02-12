@@ -1,0 +1,35 @@
+---
+title: "TIL: How to Display the AST in Rust"
+date: "2024-12-05"
+tags: ["rust", "ast", "compiler", "debugging"]
+draft: false
+summary: "Learn how to display the Abstract Syntax Tree (AST) in Rust using the `rustc` compiler and the nightly toolchain."
+---
+
+Today I learned how to view the Abstract Syntax Tree (AST) in Rust using the `rustc` compiler with the nightly toolchain.
+
+## Steps to Display the AST
+
+Install the nightly toolchain if you don't have it:
+
+```bash
+rustup install nightly
+```
+
+**Compile your Rust file using the** `-Z unpretty=ast-tree` flag to display the AST in a human-readable format:
+
+```bash
+rustc +nightly -Z unpretty=ast-tree your_file.rs
+```
+
+This will print the AST of your file directly in the terminal.
+
+**To view the expanded AST (after macros are expanded)**, use the following command:
+
+```bash
+rustc +nightly -Z unpretty=ast-tree,expanded your_file.rs
+```
+
+## Summary
+
+The `rustc` compiler provides a powerful way to inspect the internals of your code by generating the AST. This can be particularly useful when debugging or understanding how macros are expanded. The `-Z unpretty` flag offers several options to view different levels of the compiler's internal representations.

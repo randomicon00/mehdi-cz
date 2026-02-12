@@ -1,0 +1,723 @@
+---
+title: "React 19 Anti-Patterns: Common Mistakes to Avoid with Modern Hooks"
+date: "2025-09-15"
+tags: ["React", "React 19", "Anti-Patterns", "Best Practices", "Performance", "Hooks", "JavaScript"]
+draft: false
+summary: "Master React 19 by avoiding these critical anti-patterns. Learn what NOT to do with useOptimistic, useDeferredValue, useTransition, and other modern hooks to build maintainable, performant applications."
+---
+
+# React 19 Anti-Patterns: Common Mistakes to Avoid with Modern Hooks
+
+React 19 introduces powerful new hooks and concurrent features, but with great power comes great responsibility. Many developers fall into common traps that can hurt performance, create bugs, or make code unmaintainable. This comprehensive guide covers the most critical anti-patterns to avoid when working with modern React hooks.
+
+## 🚫 Anti-Pattern 1: Overusing useState for Everything
+
+### ❌ Wrong: State for Derived Values
+
+```javascript
+// DON'T DO THIS
+function UserProfile({ user }) {
+  const [fullName, setFullName] = useState("");
+
+  useEffect(() => {
+    setFullName(`${user.firstName} ${user.lastName}`);
+  }, [user.firstName, user.lastName]);
+
+  return <div>{fullName}</div>;
+}
+```
+
+### ✅ Correct: Use useMemo for Derived State
+
+```javascript
+// DO THIS INSTEAD
+function UserProfile({ user }) {
+  const fullName = useMemo(() => {
+    return `${user.firstName} ${user.lastName}`;
+  }, [user.firstName, user.lastName]);
+
+  return <div>{fullName}</div>;
+}
+```
+
+**Why it matters**: useState for derived values creates unnecessary re-renders and state synchronization issues.
+
+## 🚫 Anti-Pattern 2: useEffect Overload
+
+### ❌ Wrong: Multiple useEffect for Related Logic
+
+```javascript
+// DON'T DO THIS
+function DataComponent({ id }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    setLoading(true);
+    fetchData(id)
+      .then(setData)
+      .catch(setError)
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  useEffect(() => {
+    if (data) {
+      console.log("Data loaded:", data);
+    }
+  }, [data]);
+
+  useEffect(() => {
+    if (error) {
+      console.error("Error occurred:", error);
+    }
+  }, [error]);
+}
+```
+
+### ✅ Correct: Consolidate Related Effects
+
+```javascript
+// DO THIS INSTEAD
+function DataComponent({ id }) {
+  const [state, setState] = useState({
+    data: null,
+    loading: false,
+    error: null,
+  });
+
+  useEffect(() => {
+    setState((prev) => ({ ...prev, loading: true, error: null }));
+
+    fetchData(id)
+      .then((data) => setState((prev) => ({ ...prev, data, loading: false })))
+      .catch((error) => setState((prev) => ({ ...prev, error, loading: false })));
+  }, [id]);
+
+  useEffect(() => {
+    if (state.data) {
+      console.log("Data loaded:", state.data);
+    }
+    if (state.error) {
+      console.error("Error occurred:", state.error);
+    }
+  }, [state.data, state.error]);
+}
+```
+
+## 🚫 Anti-Pattern 3: Misusing useDeferredValue
+
+### ❌ Wrong: Deferring Critical UI Updates
+
+```javascript
+// DON'T DO THIS
+function SearchInput({ onSearch }) {
+  const [query, setQuery] = useState("");
+  const deferredQuery = useDeferredValue(query);
+
+  // ❌ Deferring the input value itself
+  return (
+    <input
+      value={deferredQuery} // This makes typing feel laggy!
+      onChange={(e) => setQuery(e.target.value)}
+    />
+  );
+}
+```
+
+### ✅ Correct: Defer Expensive Operations Only
+
+```javascript
+// DO THIS INSTEAD
+function SearchInput({ onSearch }) {
+  const [query, setQuery] = useState("");
+  const deferredQuery = useDeferredValue(query);
+
+  // ✅ Keep input responsive, defer expensive search
+  const results = useMemo(() => {
+    return expensiveSearch(data, deferredQuery);
+  }, [deferredQuery]);
+
+  return (
+    <div>
+      <input
+        value={query} // Immediate response
+        onChange={(e) => setQuery(e.target.value)}
+      />
+      <SearchResults results={results} />
+    </div>
+  );
+}
+```
+
+**Why it matters**: useDeferredValue should defer expensive computations, not user input responsiveness.
+
+## 🚫 Anti-Pattern 4: useTransition Abuse
+
+### ❌ Wrong: Wrapping Everything in Transitions
+
+```javascript
+// DON'T DO THIS
+function Counter() {
+  const [count, setCount] = useState(0);
+  const [isPending, startTransition] = useTransition();
+
+  const increment = () => {
+    startTransition(() => {
+      setCount((c) => c + 1); // ❌ Unnecessary for simple updates
+    });
+  };
+
+  return (
+    <button onClick={increment} disabled={isPending}>
+      {isPending ? "Loading..." : count}
+    </button>
+  );
+}
+```
+
+### ✅ Correct: Use Transitions for Heavy Operations
+
+```javascript
+// DO THIS INSTEAD
+function DataTable({ data, onSort }) {
+  const [sortConfig, setSortConfig] = useState(null);
+  const [isPending, startTransition] = useTransition();
+
+  const handleSort = (column) => {
+    startTransition(() => {
+      setSortConfig({ column, direction: "asc" });
+      // Heavy sorting operation here
+      onSort(column);
+    });
+  };
+
+  return (
+    <table>
+      <thead>
+        <tr>
+          <th onClick={() => handleSort("name")} disabled={isPending}>
+            Name {isPending && "(Sorting...)"}
+          </th>
+        </tr>
+      </thead>
+    </table>
+  );
+}
+```
+
+## 🚫 Anti-Pattern 5: useOptimistic Overkill
+
+### ❌ Wrong: Optimistic Updates for Critical Operations
+
+```javascript
+// DON'T DO THIS
+function BankTransfer({ onTransfer }) {
+  const [optimisticBalance, setOptimisticBalance] = useOptimistic(1000);
+
+  const handleTransfer = (amount) => {
+    // ❌ Don't use optimistic updates for financial transactions
+    setOptimisticBalance((prev) => prev - amount);
+
+    onTransfer(amount).catch(() => {
+      // Revert on failure - but this creates race conditions
+      setOptimisticBalance((prev) => prev + amount);
+    });
+  };
+}
+```
+
+### ✅ Correct: Reserve for UI/UX Enhancements
+
+```javascript
+// DO THIS INSTEAD
+function TodoList({ todos, onToggle }) {
+  const [optimisticTodos, setOptimisticTodos] = useOptimistic(todos);
+
+  const handleToggle = (id) => {
+    // ✅ Safe for UI state changes
+    setOptimisticTodos((prev) =>
+      prev.map((todo) => (todo.id === id ? { ...todo, completed: !todo.completed } : todo))
+    );
+
+    onToggle(id).catch(() => {
+      // Revert optimistic update
+      setOptimisticTodos(todos);
+    });
+  };
+}
+```
+
+## 🚫 Anti-Pattern 6: Memory Leaks with useEffect
+
+### ❌ Wrong: Missing Cleanup in Subscriptions
+
+```javascript
+// DON'T DO THIS
+function ChatRoom({ roomId }) {
+  const [messages, setMessages] = useState([]);
+
+  useEffect(() => {
+    const connection = subscribeToChat(roomId, (message) => {
+      setMessages((prev) => [...prev, message]);
+    });
+    // ❌ No cleanup - memory leak when component unmounts
+  }, [roomId]);
+}
+```
+
+### ✅ Correct: Always Clean Up
+
+```javascript
+// DO THIS INSTEAD
+function ChatRoom({ roomId }) {
+  const [messages, setMessages] = useState([]);
+
+  useEffect(() => {
+    const connection = subscribeToChat(roomId, (message) => {
+      setMessages((prev) => [...prev, message]);
+    });
+
+    return () => {
+      connection.unsubscribe(); // ✅ Proper cleanup
+    };
+  }, [roomId]);
+}
+```
+
+## 🚫 Anti-Pattern 7: Over-Engineering with Custom Hooks
+
+### ❌ Wrong: Custom Hook for Simple Logic
+
+```javascript
+// DON'T DO THIS
+function useWindowSize() {
+  const [size, setSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setSize({ width: window.innerWidth, height: window.innerHeight });
+    };
+
+    window.addEventListener("resize", handleResize);
+    handleResize();
+
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  return size;
+}
+
+// Overkill for simple usage
+function MyComponent() {
+  const { width } = useWindowSize();
+  return <div>Width: {width}</div>;
+}
+```
+
+### ✅ Correct: Keep It Simple
+
+```javascript
+// DO THIS INSTEAD
+function MyComponent() {
+  const [width, setWidth] = useState(window.innerWidth);
+
+  useEffect(() => {
+    const handleResize = () => setWidth(window.innerWidth);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  return <div>Width: {width}</div>;
+}
+```
+
+## 🚫 Anti-Pattern 8: Ignoring Hook Dependencies
+
+### ❌ Wrong: Incomplete Dependency Arrays
+
+```javascript
+// DON'T DO THIS
+function UserProfile({ userId, onUpdate }) {
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    fetchUser(userId).then(setUser);
+  }, []); // ❌ Missing userId dependency
+
+  useEffect(() => {
+    if (user) {
+      onUpdate(user); // ❌ Missing onUpdate dependency
+    }
+  }, [user]); // ❌ Missing onUpdate
+}
+```
+
+### ✅ Correct: Complete Dependencies
+
+```javascript
+// DO THIS INSTEAD
+function UserProfile({ userId, onUpdate }) {
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    fetchUser(userId).then(setUser);
+  }, [userId]); // ✅ Include all dependencies
+
+  useEffect(() => {
+    if (user) {
+      onUpdate(user);
+    }
+  }, [user, onUpdate]); // ✅ Include all dependencies
+}
+```
+
+## 🚫 Anti-Pattern 9: Race Conditions in Async Operations
+
+### ❌ Wrong: Multiple Concurrent Requests
+
+```javascript
+// DON'T DO THIS
+function SearchComponent() {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
+
+  useEffect(() => {
+    if (query) {
+      searchAPI(query).then(setResults); // ❌ Race condition
+    }
+  }, [query]);
+
+  return <input value={query} onChange={(e) => setQuery(e.target.value)} />;
+}
+```
+
+### ✅ Correct: Handle Race Conditions
+
+```javascript
+// DO THIS INSTEAD
+function SearchComponent() {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
+
+  useEffect(() => {
+    if (!query) return;
+
+    let isCurrent = true;
+
+    searchAPI(query).then((data) => {
+      if (isCurrent) {
+        setResults(data);
+      }
+    });
+
+    return () => {
+      isCurrent = false; // ✅ Prevent race conditions
+    };
+  }, [query]);
+}
+```
+
+## 🚫 Anti-Pattern 10: useCallback Overuse
+
+### ❌ Wrong: Memoizing Everything
+
+```javascript
+// DON'T DO THIS
+function ParentComponent() {
+  const [count, setCount] = useState(0);
+
+  const handleClick = useCallback(() => {
+    setCount((c) => c + 1);
+  }, []); // ❌ Unnecessary memoization
+
+  const handleReset = useCallback(() => {
+    setCount(0);
+  }, []); // ❌ Unnecessary memoization
+
+  return <ChildComponent onClick={handleClick} onReset={handleReset} />;
+}
+```
+
+### ✅ Correct: Memoize Only When Necessary
+
+```javascript
+// DO THIS INSTEAD
+function ParentComponent() {
+  const [count, setCount] = useState(0);
+
+  // ✅ Only memoize if passed to optimized children
+  const handleExpensiveOperation = useCallback(() => {
+    expensiveCalculation(count);
+  }, [count]);
+
+  return <ChildComponent onClick={() => setCount((c) => c + 1)} />;
+}
+```
+
+## 🚫 Anti-Pattern 11: Context Overuse
+
+### ❌ Wrong: Context for Everything
+
+```javascript
+// DON'T DO THIS
+const ThemeContext = createContext();
+const UserContext = createContext();
+const SettingsContext = createContext();
+
+function App() {
+  return (
+    <ThemeContext.Provider value={theme}>
+      <UserContext.Provider value={user}>
+        <SettingsContext.Provider value={settings}>
+          <ComponentThatOnlyNeedsTheme />
+        </SettingsContext.Provider>
+      </UserContext.Provider>
+    </ThemeContext.Provider>
+  );
+}
+```
+
+### ✅ Correct: Component Composition
+
+```javascript
+// DO THIS INSTEAD
+function App() {
+  return (
+    <ThemeProvider>
+      <UserProvider>
+        <SettingsProvider>
+          <MainLayout />
+        </SettingsProvider>
+      </UserProvider>
+    </ThemeProvider>
+  );
+}
+
+function MainLayout() {
+  return (
+    <div>
+      <Header />
+      <ThemeConsumer>
+        <ComponentThatOnlyNeedsTheme />
+      </ThemeConsumer>
+    </div>
+  );
+}
+```
+
+## 🚫 Anti-Pattern 12: Ignoring React 19 Concurrent Features
+
+### ❌ Wrong: Blocking the Main Thread
+
+```javascript
+// DON'T DO THIS
+function HeavyComputation({ data }) {
+  const [result, setResult] = useState(null);
+
+  useEffect(() => {
+    // ❌ Heavy computation blocks the main thread
+    const computed = heavyCalculation(data);
+    setResult(computed);
+  }, [data]);
+
+  return <div>{result}</div>;
+}
+```
+
+### ✅ Correct: Leverage Concurrent Features
+
+```javascript
+// DO THIS INSTEAD
+function HeavyComputation({ data }) {
+  const deferredData = useDeferredValue(data);
+  const [isPending, startTransition] = useTransition();
+
+  const result = useMemo(() => {
+    return heavyCalculation(deferredData);
+  }, [deferredData]);
+
+  const handleDataChange = (newData) => {
+    startTransition(() => {
+      setData(newData);
+    });
+  };
+
+  return (
+    <div>
+      {data !== deferredData && <div>Computing...</div>}
+      {isPending && <div>Updating...</div>}
+      <div>{result}</div>
+    </div>
+  );
+}
+```
+
+## 🚫 Anti-Pattern 13: Testing Hooks Incorrectly
+
+### ❌ Wrong: Testing Implementation Details
+
+```javascript
+// DON'T DO THIS
+test("useCounter hook", () => {
+  const { result } = renderHook(() => useCounter());
+
+  act(() => {
+    result.current.increment(); // ❌ Testing internal implementation
+  });
+
+  expect(result.current.count).toBe(1); // ❌ Testing internal state
+});
+```
+
+### ✅ Correct: Test Behavior, Not Implementation
+
+```javascript
+// DO THIS INSTEAD
+function CounterComponent() {
+  const { count, increment } = useCounter();
+  return (
+    <div>
+      <span>{count}</span>
+      <button onClick={increment}>Increment</button>
+    </div>
+  );
+}
+
+test("counter increments when button clicked", () => {
+  render(<CounterComponent />);
+
+  expect(screen.getByText("0")).toBeInTheDocument();
+
+  fireEvent.click(screen.getByText("Increment"));
+
+  expect(screen.getByText("1")).toBeInTheDocument();
+});
+```
+
+## 🚫 Anti-Pattern 14: Performance Myths
+
+### ❌ Wrong: Premature Optimization
+
+```javascript
+// DON'T DO THIS
+function ListItem({ item, onClick }) {
+  const handleClick = useCallback(() => {
+    onClick(item.id);
+  }, [onClick, item.id]); // ❌ Optimizing without measuring
+
+  return <div onClick={handleClick}>{item.name}</div>;
+}
+```
+
+### ✅ Correct: Measure Before Optimizing
+
+```javascript
+// DO THIS INSTEAD
+function ListItem({ item, onClick }) {
+  // ✅ Profile first, optimize only if needed
+  return <div onClick={() => onClick(item.id)}>{item.name}</div>;
+}
+
+// Use React DevTools Profiler to identify real bottlenecks
+```
+
+## 🚫 Anti-Pattern 15: Error Boundaries Neglect
+
+### ❌ Wrong: No Error Boundaries
+
+```javascript
+// DON'T DO THIS
+function App() {
+  return (
+    <div>
+      <Header />
+      <MainContent /> {/* ❌ No error boundary */}
+      <Footer />
+    </div>
+  );
+}
+```
+
+### ✅ Correct: Strategic Error Boundaries
+
+```javascript
+// DO THIS INSTEAD
+function App() {
+  return (
+    <ErrorBoundary fallback={<ErrorFallback />}>
+      <div>
+        <ErrorBoundary fallback={<HeaderError />}>
+          <Header />
+        </ErrorBoundary>
+        <ErrorBoundary fallback={<ContentError />}>
+          <MainContent />
+        </ErrorBoundary>
+        <Footer />
+      </div>
+    </ErrorBoundary>
+  );
+}
+```
+
+## Key Takeaways
+
+### 🚫 What to Avoid:
+
+1. **Overusing useState** for derived values
+2. **Multiple useEffect** for related logic
+3. **Deferring critical UI updates** with useDeferredValue
+4. **Wrapping simple updates** in useTransition
+5. **Optimistic updates** for critical operations
+6. **Missing cleanup** in useEffect
+7. **Over-engineering** with unnecessary custom hooks
+8. **Incomplete dependency arrays**
+9. **Race conditions** in async operations
+10. **useCallback overuse**
+11. **Context overuse**
+12. **Ignoring concurrent features**
+13. **Testing implementation details**
+14. **Premature optimization**
+15. **Neglecting error boundaries**
+
+### ✅ Best Practices:
+
+- Use **useMemo** for expensive computations
+- Consolidate related **useEffect** hooks
+- Keep user input **immediately responsive**
+- Reserve **useTransition** for heavy operations
+- Use **optimistic updates** only for UI enhancements
+- Always **clean up subscriptions**
+- Keep code **simple and readable**
+- Include **all dependencies** in arrays
+- Handle **race conditions** properly
+- **Measure performance** before optimizing
+- Use **error boundaries** strategically
+
+## Performance Checklist
+
+Before implementing any optimization:
+
+```javascript
+const performanceChecklist = {
+  measureFirst: true,
+  identifyBottlenecks: true,
+  useReactDevTools: true,
+  considerBundleSize: true,
+  testRealWorldScenarios: true,
+  avoidPrematureOptimization: true,
+};
+```
+
+## Conclusion
+
+React 19's new hooks are powerful tools, but they require careful usage to avoid common pitfalls. The key is understanding when and how to use each hook appropriately. Remember:
+
+- **useDeferredValue**: For expensive computations that can lag behind
+- **useTransition**: For non-urgent updates with loading feedback
+- **useOptimistic**: For UI enhancements, not critical operations
+- **useMemo/useCallback**: Only when necessary, not prophylactically
+
+By avoiding these anti-patterns and following React's best practices, you'll build more maintainable, performant, and reliable React applications. Always measure performance, test thoroughly, and keep your code simple and readable.
+
+The most important rule: **Don't optimize prematurely**. Use React DevTools to identify real bottlenecks before applying any optimizations. Most performance issues come from architectural decisions, not micro-optimizations.

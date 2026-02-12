@@ -1,0 +1,32 @@
+---
+title: "Rust Async Libraries"
+date: "2024-10-25"
+tags: ["rust", "async", "tokio", "async-std", "await", "smol"]
+draft: false
+summary: Rust relies on external libraries like Tokio, async-std, and smol for asynchronous programming, offering flexibility and different performance levels to suit various project needs.
+---
+
+# Rust Async's Main Libraries
+
+Rust, unlike Go, does not have a built-in asynchronous runtime like
+goroutines. Instead, asynchronous programming in Rust relies on external
+libraries, offering developers more flexibility but requiring some
+setup.
+
+1. **tokio**: The most popular async runtime in Rust, widely used for
+   high-performance network applications. It provides a multithreaded
+   scheduler, async I/O, timers, and more. Its ecosystem includes utilities
+   like `tokio::fs` and `tokio::net`, making it ideal for web services.
+
+2. **async-std**: Modeled after Rust's standard library, this runtime
+   offers familiar abstractions like `File`, `TcpStream`, and `Mutex` in an async
+   context. It's known for ease of use and compatibility with existing
+   code.
+
+3. **smol**: A lightweight, minimal runtime with a focus on simplicity.
+   Smol is perfect for smaller projects where performance isn't the
+   primary concern.
+
+These libraries allow developers to write non-blocking code in Rust,
+offering various levels of abstraction and performance depending on
+project needs.

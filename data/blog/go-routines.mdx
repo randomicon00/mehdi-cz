@@ -1,0 +1,19 @@
+---
+title: "Go Routines: Built-in Concurrency"
+date: "2025-01-05"
+tags: ["go", "goroutines", "concurrency", "parallelism", "async"]
+draft: false
+summary: Go's goroutines provide a built-in concurrency mechanism that makes it easy to run functions asynchronously, with efficient resource management.
+---
+
+# Go Routines: Built-in Concurrency
+
+Go provides **goroutines**, a built-in concurrency mechanism that allows developers to run functions asynchronously without needing external libraries. Goroutines are lightweight and managed by the Go runtime, which efficiently schedules them across available CPU cores.
+
+1. **Concurrency Made Easy**: By using the `go` keyword before a function call, Go allows that function to run concurrently. Goroutines are cheaper in terms of memory and CPU usage than traditional threads.
+
+2. **Channels for Communication**: Go also includes **channels**, which enable safe communication between goroutines. Channels are type-safe and allow developers to pass data between goroutines, avoiding race conditions and making concurrency simpler.
+
+3. **Efficient Scheduling**: The Go runtime automatically manages goroutines, ensuring they are scheduled efficiently on multiple cores without manual intervention.
+
+Goroutines make asynchronous programming in Go easy, providing built-in concurrency without the need for complex setup or external dependencies.

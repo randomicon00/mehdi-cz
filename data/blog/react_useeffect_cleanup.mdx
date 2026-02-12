@@ -1,0 +1,213 @@
+---
+title: "When Does React Run the useEffect Cleanup? (The Clear, No-Drama Guide)"
+date: "2025-09-19"
+tags: ["react", "useEffect", "effects", "cleanup", "strict-mode", "react-18"]
+draft: false
+summary: "A friendly expert guide explaining exactly when React runs useEffect cleanups—before the next run and on unmount—plus React 18 Strict Mode’s dev-only double-invoke."
+---
+
+# When Does React Run the `useEffect` Cleanup? (The Clear, No-Drama Guide)
+
+A lot of engineers “feel” how `useEffect` works but still get tripped up by its cleanup. Here’s the practical, expert-level explanation with just enough internals to make the behavior predictable.
+
+---
+
+## The one-sentence answer
+
+React runs your `useEffect` cleanup **right before it runs that effect again**, and **when the component unmounts**. In React 18 **development** with Strict Mode, React also does a **mount → effect → cleanup → effect** dance on purpose to help you catch bugs—this does **not** happen in production.
+
+---
+
+## Mental model (in 6 bullets)
+
+1. **Initial render** → effect runs (there’s nothing to clean yet).
+2. **Dependency change** (or no deps → re-render) → **cleanup of the previous effect runs first**, then the effect runs again.
+3. **Unmount** → cleanup runs.
+4. **React 18 StrictMode (dev only)**: after mounting, React **immediately runs cleanup and then re-runs** the effect to simulate mount/unmount. Production builds do not do this.
+5. **Interrupted renders** (concurrent features): if an update is rendered but not committed, **no effect and no cleanup** run.
+6. **Server rendering**: effects and cleanups **don’t run on the server**.
+
+---
+
+## The 3 big scenarios (with tiny examples)
+
+### 1) Unmount
+
+You mounted a component and subscribed to something. When it leaves the tree, React cleans it up.
+
+```tsx
+useEffect(() => {
+  const id = setInterval(tick, 1000);
+  return () => clearInterval(id); // runs on unmount
+}, []); // empty deps → set up once, clean up on unmount
+```
+
+### 2) Dependencies change
+
+When any value in the deps array changes (shallow comparison), React tears down the **previous** side effect and then sets up the **new** one.
+
+```tsx
+useEffect(() => {
+  const socket = new WebSocket(`/ws?room=${roomId}`);
+  return () => socket.close(); // runs before effect re-runs with new roomId
+}, [roomId]);
+```
+
+### 3) React 18 Strict Mode (dev only)
+
+You’ll see logs like: “setup → cleanup → setup” even though nothing changed. That’s intentional in dev to surface effect bugs.
+
+```tsx
+useEffect(() => {
+  console.log("setup");
+  return () => console.log("cleanup");
+}, []);
+// Dev StrictMode: setup → cleanup → setup on mount.
+// Production: just setup.
+```
+
+---
+
+## When cleanup does **not** run
+
+- The effect **never ran** (e.g., server render, or a render that never committed).
+- A re-render happened but **dependencies didn’t change** (for `useEffect(..., [deps])`).
+- The app/tab hard-crashes or the process dies (don’t rely on cleanup for guaranteed persistence/analytics).
+
+---
+
+## `useEffect` vs `useLayoutEffect` (timing nuance)
+
+- **`useEffect`** runs **after paint**. Its cleanup runs **before** the next effect run or on unmount (asynchronously).
+- **`useLayoutEffect`** runs **after DOM mutations but before paint**. Its cleanup runs **synchronously** before the next layout effect or unmount. Use it for measuring layout or synchronizing with non-React UI libraries.
+
+```tsx
+useLayoutEffect(() => {
+  const rect = el.current!.getBoundingClientRect();
+  // ...
+  return () => {
+    /* detach layout sync things here */
+  };
+}, [someLayoutKey]);
+```
+
+---
+
+## The “is this component mounted?” question
+
+You rarely need an explicit `isMounted` flag. What you really want is to **cancel or ignore stale async work**. Do that in the cleanup:
+
+### Option A: `AbortController` (fetch)
+
+```tsx
+useEffect(() => {
+  const ac = new AbortController();
+
+  (async () => {
+    try {
+      const res = await fetch(url, { signal: ac.signal });
+      const data = await res.json();
+      setData(data); // safe: if aborted, fetch throws and we skip
+    } catch (e) {
+      if ((e as DOMException).name !== "AbortError") throw e;
+    }
+  })();
+
+  return () => ac.abort(); // cancels in-flight fetch on dep change/unmount
+}, [url]);
+```
+
+### Option B: a simple “ignore if stale” flag
+
+```tsx
+useEffect(() => {
+  let alive = true;
+
+  doAsyncThing().then((result) => {
+    if (alive) setResult(result); // ignore if cleaned up
+  });
+
+  return () => {
+    alive = false;
+  };
+}, [key]);
+```
+
+> Don’t store `isMounted` in state; a local variable closed over by the effect is cheaper and purpose-built for “ignore after cleanup”.
+
+---
+
+## Common patterns that rely on cleanup
+
+### Subscriptions / event listeners
+
+```tsx
+useEffect(() => {
+  function onResize() {
+    /* ... */
+  }
+  window.addEventListener("resize", onResize);
+  return () => window.removeEventListener("resize", onResize);
+}, []); // or [deps] if handler depends on them
+```
+
+### Timers
+
+```tsx
+useEffect(() => {
+  const id = setTimeout(doWork, delay);
+  return () => clearTimeout(id);
+}, [delay]);
+```
+
+### External libraries that mutate the DOM
+
+```tsx
+useLayoutEffect(() => {
+  const instance = thirdParty.mount(container.current!);
+  return () => instance.destroy(); // remove observers, detach nodes
+}, []);
+```
+
+---
+
+## Why your cleanup “runs right away” in dev
+
+If you see your cleanup firing immediately after setup on first mount, you’re almost certainly in **React 18 Strict Mode (development)**. React mounts your component, runs effects, **cleans them up**, then mounts again and runs effects again. It’s a safety check that catches:
+
+- Effects with **non-idempotent** setup that leak (e.g., double-adding listeners).
+- Effects that **rely on mount order** or assume single initialization.
+
+If your effect stays correct under this mount/cleanup/mount cycle, it’s robust.
+
+---
+
+## Quick checklist
+
+- Returning a function from `useEffect` **is** your cleanup. If you don’t need one, return nothing.
+- If your effect depends on values, **put them in the deps array**; React will clean up & re-run when they change.
+- For async, **cancel or ignore stale work** in cleanup (AbortController or an `alive` flag).
+- Use **`useLayoutEffect`** for DOM measurement/sync; otherwise prefer `useEffect`.
+- Don’t panic about dev-only double invoke; verify it doesn’t happen in production.
+
+---
+
+## Tiny gotchas (and fixes)
+
+- **Parent re-renders** without deps changing → your effect will **not** re-run, so cleanup will **not** run either. If you’re depending on parent props, make sure they’re **in deps**.
+- **Error boundaries** that catch during render → effect never ran; there’s nothing to clean.
+- **Suspense**: if a subtree is actually unmounted (switching fallbacks), its cleanup runs. If rendering was discarded pre-commit, neither effect nor cleanup run.
+
+---
+
+## TL;DR with a table
+
+| Situation                          | Does cleanup run?                 | When                                                 |
+| ---------------------------------- | --------------------------------- | ---------------------------------------------------- |
+| First mount                        | No (there’s nothing to clean yet) | —                                                    |
+| Dependency change                  | **Yes**                           | Before the effect re-runs                            |
+| Unmount                            | **Yes**                           | During unmount                                       |
+| Dev StrictMode (React 18)          | **Yes**                           | Immediately after first setup, then setup runs again |
+| Re-render w/ unchanged deps        | No                                | —                                                    |
+| Render interrupted (not committed) | No                                | —                                                    |
+| Server render                      | No                                | —                                                    |

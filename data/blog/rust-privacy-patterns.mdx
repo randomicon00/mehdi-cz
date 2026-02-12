@@ -1,0 +1,104 @@
+---
+title: "Rust Privacy and Sealing Patterns: Using `private` for Safe API Design"
+date: "2025-02-17"
+tags: ["rust", "api design", "privacy", "sealing patterns"]
+draft: false
+summary: "Discover how to effectively use Rust's module privacy to seal structs and traits, control access, and enforce safe API boundaries."
+---
+
+In Rust, modules provide a flexible way to control access to your code. If you’re designing a library or module and want to prevent others from implementing a trait or directly accessing internal details, Rust’s privacy model lets you “seal” traits and structs by keeping certain items private. This article explores how to do it effectively, leveraging Rust’s inherent module privacy and the use of `private` traits or modules.
+
+---
+
+### Why Seal a Trait or Struct?
+
+Sealing a trait or struct means **restricting its implementation or usage** to only those cases you explicitly allow. This can be helpful when you:
+
+- Want to control how traits are implemented, especially in a library.
+- Ensure that certain methods or fields are used only internally.
+- Provide a stable API for external users while keeping flexibility in your internal code.
+
+---
+
+### How to Seal a Trait in Rust
+
+In Rust, **sealing** can be achieved by using a private helper trait. This helper trait acts as a “marker,” ensuring only certain types can implement or use the main trait.
+
+### Example: Sealing a Trait with a Private Module
+
+Here's an example of how to create a sealed trait that prevents external implementations:
+
+```rust
+// Define a public trait
+pub trait MyTrait: private::Sealed {
+    fn my_method(&self);
+}
+
+// Internal private module for the sealing mechanism
+mod private {
+    pub trait Sealed {}
+    impl Sealed for crate::MyStruct {} // Only `MyStruct` can implement `MyTrait`
+}
+
+pub struct MyStruct;
+
+impl MyTrait for MyStruct {
+    fn my_method(&self) {
+        println!("MyStruct implementing MyTrait");
+    }
+}
+```
+
+#### Explanation
+
+- `private::Sealed` is a private trait inside the `private` module, which cannot be accessed outside the crate.
+- `MyTrait` extends `private::Sealed`, meaning that only the types implmenting `Sealed` can implement `MyTrait`.
+- `impl Sealed for MyStruct` restricts `MyTrait` implementations to `MyStruct`, and so it effectively seals `MyTrait`.
+
+This allows and ensures that **no other types outside of this module can implement `MyTrait`**.
+
+### Sealing Structs: Keeping Fields Private
+
+Rust also allows you to control struct field access by setting their visibility to private. This is useful when you want external users to create instances but prevent them from accessing or modifying fields directly.
+
+```rust
+pub struct Config {
+    field1: i32,         // Private field
+    pub field2: String,  // Public field
+}
+
+impl Config {
+    pub fn new(field2: String) -> Self {
+        Config { field1: 42, field2 }
+    }
+
+    pub fn get_field1(&self) -> i32 {
+        self.field1
+    }
+}
+```
+
+Here, `field1` is private and accessible only within the module, while `field2` is public. External code can use `get_field1` to access `field1` but can’t modify it directly.
+
+### Using Private Modules for Full Encapsulation
+
+Sometimes, you may want to restrict access to an entire module or set of functions, keeping them entirely private. This can be done with a private module:
+
+```rust
+mod internal_utils {
+    pub(crate) fn helper_function() {
+        println!("Internal helper function");
+    }
+}
+
+pub fn public_function() {
+    // You can call `helper_function` here, but it's not accessible outside this module
+    internal_utils::helper_function();
+}
+```
+
+In this example, `helper_function` is only accessible within the crate and invisible to external users, allowing for safe encapsulation of internal logic.
+
+### Last Words
+
+By using Rust's module privacy effectively, it is possible to build APIs, whose internal implementation is **flexible**, and are **consistent** and **safe** from a user's standpoint.

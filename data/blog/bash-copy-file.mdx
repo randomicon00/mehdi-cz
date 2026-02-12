@@ -1,0 +1,56 @@
+---
+title: "Today I Learnt: Copy files with cp"
+date: "2025-09-16"
+tags: ["bash", "til"]
+draft: false
+summary: "Use cp to copy files and directories."
+---
+
+Copy a file:
+
+```bash
+cp src.txt dest.txt
+```
+
+Copy recursively:
+
+```bash
+cp -r srcdir/ destdir/
+```
+
+## Tip: `cp -a` preserves attributes and is useful for backups.
+
+title: "Copy a file with cp"
+date: "2025-09-16"
+tags: ["bash","til"]
+draft: false
+summary: "Use cp to copy files and preserve attributes when needed."
+
+---
+
+```bash
+cp source.txt dest.txt
+# preserve mode, ownership and timestamps
+cp -a source.txt dest_dir/
+```
+
+Tips:
+
+- Use `cp -r` for directories.
+- `cp -a` keeps metadata; use sudo when copying system files.
+
+---
+
+title: "Today I Learnt: Copy files with cp"
+date: "2025-09-16"
+tags: ["bash", "til"]
+draft: false
+summary: "Copy files preserving attributes."
+
+---
+
+Copy a file preserving attributes:
+
+```bash
+cp -a source.txt dest.txt
+```

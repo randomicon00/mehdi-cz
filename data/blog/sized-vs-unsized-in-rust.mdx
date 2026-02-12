@@ -1,0 +1,179 @@
+---
+title: "Sized vs !Sized: Understanding Sizedness in Rust"
+date: "2025-01-28"
+tags: ["Rust", "Programming", "Memory Management", "Sizedness"]
+draft: false
+summary: "Rust's concept of sizedness is crucial to understanding how the language manages memory, especially when dealing with types like slices, trait objects, and user-defined unsized types. This article explores the intricacies of the Sized and !Sized traits, and their impact on Rust programming."
+---
+
+Sizedness is one of the most critical concepts in Rust. It interacts with many other language features in often subtle ways and usually only manifests itself through error messages like "x doesn't have a size known at compile time," which most Rustaceans are all too familiar with. In this article, we'll dive into the different types of sizedness—`Sized`, `!Sized`, and zero-sized types—while examining their use cases, benefits, challenges, and workarounds.
+
+### What is Sizedness?
+
+In Rust, a type is considered _sized_ if its size in bytes can be determined at compile time. This is essential for allocating space for instances of that type on the stack. If a type's size cannot be determined at compile time, it's called an _unsized type_ or a _dynamically-sized type_ (DST). Since unsized types cannot be allocated directly on the stack, they must always be used behind some form of pointer, like `&` or `Box`. Examples of sized and unsized types include:
+
+```rust
+use std::mem::size_of;
+
+fn main() {
+    // Primitives
+    assert_eq!(4, size_of::<i32>());
+    assert_eq!(8, size_of::<f64>());
+
+    // Tuples
+    assert_eq!(8, size_of::<(i32, i32)>());
+
+    // Arrays
+    assert_eq!(0, size_of::<[i32; 0]>());
+    assert_eq!(12, size_of::<[i32; 3]>());
+
+    struct Point {
+        x: i32,
+        y: i32,
+    }
+
+    // Structs
+    assert_eq!(8, size_of::<Point>());
+}
+```
+
+The way Rust determines the size of _sized_ types is straightforward. All primitives, pointers, and aggregates such as structs, tuples, and arrays are composed of elements with known sizes. The sizes are computed recursively, accounting for padding and alignment. However, unsized types, such as slices (`[T]`) or trait objects (`dyn Trait`), are more complex, as their sizes can only be determined at runtime.
+
+### The `Sized` Trait
+
+The `Sized` trait is a built-in, marker auto trait in Rust. It gets automatically implemented for any type that has a known size at compile time. All types, except for dynamically sized ones, implement `Sized` by default. This means:
+
+- Structs, enums, tuples, and arrays are all `Sized` as long as their fields are `Sized`.
+- Types like `[T]`, `str`, and `dyn Trait` do not implement `Sized` and must be used behind pointers.
+
+```rust
+// `Sized` is an "auto" marker trait
+trait Foo: Sized {
+    fn bar(&self);
+}
+```
+
+### `Sized` in Generics
+
+In generic code, Rust implicitly adds a `Sized` bound to all type parameters:
+
+```rust
+// Equivalent to fn example<T: Sized>(t: T)
+fn example<T>(t: T) {}
+```
+
+However, there are cases where a type parameter may be unsized. You can explicitly opt-out of the `Sized` bound by using `?Sized`:
+
+```rust
+fn example<T: ?Sized>(t: &T) {}
+```
+
+This makes `example` more flexible, allowing it to work with both sized and unsized types. It’s particularly useful for traits, slices, or types like `str`.
+
+### Unsized Types and Their Use Cases
+
+**Slices:** A common unsized type in Rust is a slice (`[T]`), such as `&[i32]` or `&str`. Slices are _double-width_ pointers that store a reference to the data and the number of elements.
+
+**Trait Objects:** Traits in Rust can be turned into _trait objects_, which allow for dynamic dispatch. However, not all traits are object-safe, and traits by default are `?Sized`. This means:
+
+```rust
+trait Foo {
+    fn bar(&self);
+}
+
+fn process(t: &dyn Foo) {
+    t.bar();
+}
+```
+
+Trait objects are represented by fat pointers, which store both the reference to the data and a pointer to a vtable used to resolve methods.
+
+**User-Defined Unsized Types:** You can define a custom unsized type, but the unsized field must be the last one:
+
+```rust
+struct CustomUnsized<T: ?Sized> {
+    data: T,
+}
+```
+
+### Zero-Sized Types (ZSTs)
+
+Zero-Sized Types are types that occupy zero bytes of memory. Examples include:
+
+- **Unit Type (`()`):** Used in functions that return nothing.
+
+```rust
+fn do_nothing() -> () {
+  // This function returns the unit type `()`
+}
+```
+
+- **User-Defined Unit Structs:** Structs without fields also have zero size.
+
+```rust
+struct EmptyStruct;
+
+fn main() {
+  let instance = EmptyStruct;
+  // `instance` is a ZST
+}
+```
+
+- **Never Type (`!`):** Represents computations that never complete (e.g., functions that `panic!`).
+
+```rust
+fn impossible() -> ! {
+  panic!("This function never returns!");
+}
+```
+
+- **PhantomData:** A marker type used for ownership without any runtime overhead.
+
+```rust
+use std::marker::PhantomData;
+
+struct MyStruct<T> {
+  _marker: PhantomData<T>,
+}
+
+fn main() {
+  let instance: MyStruct<i32> = MyStruct { _marker: PhantomData };
+  // `instance` uses PhantomData to indicate ownership of `T` without any runtime cost
+}
+```
+
+### Conclusion
+
+Understanding Rust's `Sized` and `!Sized` concepts is crucial for writing efficient and correct programs. Rust's memory model demands explicit handling of types that cannot have their size known at compile time, which directly impacts how data is stored, passed, and used. By mastering these concepts, you can leverage Rust's powerful type system to write more flexible and safer code.
+
+For further reading, check out the official [Rust documentation on dynamically-sized types](https://doc.rust-lang.org/book/ch19-04-advanced-types.html#dynamically-sized-types-and-the-sized-trait).
+
+### FAQ
+
+**1. What is the `Sized` trait in Rust?**
+
+The `Sized` trait is a built-in, marker trait that indicates whether a type has a known size at compile time. Most types in Rust are `Sized` by default, except for dynamically-sized types like slices (`[T]`), strings (`str`), and trait objects (`dyn Trait`).
+
+**2. Are types `Sized` by default in Rust?**
+
+Yes, types are `Sized` by default in Rust. This means that unless explicitly opted out with `?Sized`, the compiler assumes that a type's size is known at compile time. Besides `Sized`, other traits like `Send` and `Sync` are also auto traits that are implemented automatically if a type meets certain conditions. `Send` indicates that a type is safe to transfer between threads, while `Sync` means that it is safe for a type to be shared between threads.
+
+**3. Why can't unsized types be stored directly on the stack?**
+
+Unsized types cannot be stored directly on the stack because their size is not known at compile time, making it impossible for the compiler to allocate the necessary memory. Instead, unsized types are used behind pointers, such as `&`, `Box`, or `Rc`.
+
+**4. How do you use `?Sized` in generics?**
+
+The `?Sized` bound in generics allows a type parameter to be either sized or unsized. By default, all generic type parameters are assumed to be `Sized`, but using `?Sized` makes the function or struct more flexible, enabling it to work with unsized types like slices or trait objects.
+
+**5. What are zero-sized types (ZSTs) and when are they used?**
+
+Zero-sized types (ZSTs) are types that occupy no memory. Examples include the unit type `()`, unit-like structs, and the never type `!`. They are useful for type-level programming, marker types, or when you need to indicate the presence of something without actually allocating memory for it.
+
+**6. What is the difference between a slice and an array in Rust?**
+
+An array in Rust has a fixed size known at compile time, whereas a slice is a dynamically-sized view into an array. Arrays are `Sized` types, while slices (`[T]`) are unsized types that are usually used behind pointers like `&[T]`.
+
+**7. Can a trait object have methods that take `Self` by value?**
+
+No, trait objects cannot have methods that take `Self` by value because the concrete type behind the trait object is not known at runtime. This restriction ensures that trait objects remain usable even when the underlying type is not sized.

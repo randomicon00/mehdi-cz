@@ -1,0 +1,311 @@
+---
+title: "Today I Learnt: Centralize your API IDLs — avoid circular upgrade hell"
+date: "2025-09-16"
+tags: ["grpc", "protobuf", "openapi", "apis", "til"]
+draft: false
+summary: "Why keeping your protobuf/OpenAPI contracts in a single repository and publishing generated SDKs avoids circular upgrade problems — with examples for Go and TypeScript."
+---
+
+If two services generate clients from each other's specs during their own builds, you can accidentally create a circular upgrade loop: updating A forces B to update, which forces A to update, and so on. The simple fix is to treat your API contract (IDL) as a versioned library and publish generated SDKs that services depend on.
+
+This article explains the problem and shows a pragmatic setup (single `apis/` repo, codegen, publishing, and CI checks). Examples include Protobuf/gRPC (Go + ts-proto) and OpenAPI (REST) snippets. Copy the Makefile and generation commands to bootstrap a small `apis/` repo locally.
+
+## What the comment was saying (plain English)
+
+- Put API contracts (Protobuf/OpenAPI) in one repo — the single source of truth.
+- Generate language-specific packages from that repo and publish them with semver.
+- Services should depend on those published packages (pin versions), not on each other's source or generated artifacts.
+- If each service generates the other's client in its build, you can create circular upgrade pressure (A → B → A). That leads to unstable builds and painful version churn.
+- Protobuf/gRPC helps because its conventions encourage additive, backward-compatible changes. OpenAPI/REST tends to be more loosely enforced and teams sometimes make breaking changes by mistake.
+
+## Why a separate `apis/` repo helps
+
+- Single source of truth for IDLs; no copy-paste or ad-hoc generation across many repos.
+- CI can run lints and breaking-change checks (e.g., `buf` for protobuf, `openapi-diff` for OpenAPI).
+- Generated SDKs are published and versioned; services upgrade at their own pace.
+- No on-the-fly codegen during normal service builds, so no accidental cross-pulls.
+
+## Suggested repo layout
+
+```
+apis/                      # single source of truth
+  proto/
+    a/v1/a.proto
+    b/v1/b.proto
+  openapi/
+    a/v1/openapi.yaml
+    b/v1/openapi.yaml
+  Makefile
+  buf.yaml                 # optional: buf for lint + breaking-change checks
+```
+
+Tag releases like `v1.3.0`. CI builds and publishes generated packages for each supported language:
+
+- Go: `github.com/yourorg/apis/gen/go/a/v1@v1.3.0`
+- TypeScript: `@yourorg/apis-a-v1@1.3.0`
+- Python: `yourorg-apis-a-v1==1.3.0`
+
+Services then add these as normal dependencies and pin to a released semver.
+
+## Protobuf (gRPC) example
+
+`proto/a/v1/a.proto`
+
+```proto
+syntax = "proto3";
+package a.v1;
+
+option go_package = "github.com/yourorg/apis/gen/go/a/v1;av1";
+
+message Invoice {
+  int64 id = 1;
+  string currency = 2;
+  // SAFE ADD: adding a new optional field with a new tag is backward compatible
+  string note = 3; // added in v1.3.0
+}
+
+message GetInvoiceRequest {
+  int64 id = 1;
+}
+
+service Billing {
+  rpc GetInvoice(GetInvoiceRequest) returns (Invoice);
+}
+```
+
+### Generate (Go + TypeScript)
+
+Go generation (protoc + go-grpc):
+
+```bash
+protoc \
+  --go_out=gen/go --go_opt=paths=source_relative \
+  --go-grpc_out=gen/go --go-grpc_opt=paths=source_relative \
+  proto/a/v1/a.proto
+```
+
+TypeScript generation (ts-proto):
+
+```bash
+protoc \
+  --plugin=./node_modules/.bin/protoc-gen-ts_proto \
+  --ts_proto_out=gen/ts --ts_proto_opt=env=node,outputServices=grpc-js \
+  proto/a/v1/a.proto
+```
+
+These commands write generated sources under `gen/` which you can package and publish.
+
+### Use the generated packages in a Go service (server)
+
+`go.mod` (service A)
+
+```go
+module github.com/yourorg/service-a
+
+require github.com/yourorg/apis/gen/go/a/v1 v1.3.0
+```
+
+`server.go`
+
+```go
+package main
+
+import (
+  "context"
+  av1 "github.com/yourorg/apis/gen/go/a/v1"
+)
+
+type billingServer struct {
+  av1.UnimplementedBillingServer
+}
+
+func (s *billingServer) GetInvoice(ctx context.Context, r *av1.GetInvoiceRequest) (*av1.Invoice, error) {
+  return &av1.Invoice{Id: r.Id, Currency: "USD", Note: "hello"}, nil
+}
+
+// register gRPC server as usual
+```
+
+### Use another service's client (pinned) in Go
+
+`go.mod` for Service A consuming B's client:
+
+```go
+require github.com/yourorg/apis/gen/go/b/v1 v1.2.1
+```
+
+```go
+bv1 "github.com/yourorg/apis/gen/go/b/v1"
+client := bv1.NewShippingClient(conn)
+res, err := client.Track(ctx, &bv1.TrackRequest{Id: 123})
+```
+
+Because both packages are pinned to release versions, Service A's build won't unexpectedly pull B's current source during CI — you control when to upgrade.
+
+## REST / OpenAPI example and how it breaks
+
+REST/OpenAPI is powerful, but teams sometimes make breaking changes accidentally.
+
+Good (additive): adding an optional response field
+
+```yaml
+paths:
+  /invoices/{id}:
+    get:
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, currency]
+                properties:
+                  id: { type: integer, format: int64 }
+                  currency: { type: string }
+                  note: { type: string } # ADDED: optional
+```
+
+Bad (breaking): renaming a required field
+
+```yaml
+# BEFORE
+required: [id, currency]
+
+# AFTER (BREAKING)
+required: [invoiceId, currency]  # 'id' → 'invoiceId' = breaks older clients
+```
+
+With OpenAPI, it's easy to accidentally rename fields, change required lists, or change response shapes — all of which can break consumers if they rely on generated types or runtime parsing.
+
+## Protobuf compatibility quick rules (why gRPC/protobuf is safer)
+
+- ✅ Add fields with new tag numbers → usually backward compatible.
+- ❌ Rename/remove fields or reuse tag numbers → breaking.
+- ✅ Use `reserved` to lock old tags/names after removal.
+
+```proto
+message Invoice {
+  reserved 5, 6;       // don't reuse these tag numbers
+  reserved "oldName"; // don't reuse this field name
+}
+```
+
+## Release flow that avoids circular upgrades
+
+1. Change IDL (prefer additive changes).
+2. Run checks: linters, `buf breaking` (for protobuf), `openapi-diff` (for OpenAPI).
+3. Tag & publish generated SDKs (e.g., v1.3.0).
+4. Services bump IDL package versions on their own schedule.
+5. Deploy services independently.
+
+No service builds the other's IDL on the fly; both consume pinned artifacts.
+
+## Minimal Makefile (copy into `apis/` repo)
+
+```makefile
+VERSION ?= $(shell git describe --tags --always)
+
+proto-go:
+	protoc --go_out=gen/go --go_opt=paths=source_relative \
+	       --go-grpc_out=gen/go --go-grpc_opt=paths=source_relative \
+	       $(shell find proto -name '*.proto')
+
+proto-ts:
+	protoc --plugin=./node_modules/.bin/protoc-gen-ts_proto \
+	       --ts_proto_out=gen/ts --ts_proto_opt=env=node,outputServices=grpc-js \
+	       $(shell find proto -name '*.proto')
+
+publish-go:
+	# Package and push module for each generated go package (example placeholder)
+	echo "Publish go modules (implement per org)"
+
+publish-ts:
+	# e.g., npm version $(VERSION) && npm publish
+	echo "Publish TS packages (implement per org)"
+
+lint:
+	# optional: buf lint
+	buf lint
+
+breaking-check:
+	# optional: buf breaking against a baseline
+	buf breaking --against .local/baseline
+
+all: proto-go proto-ts
+```
+
+## If you can't centralize right now
+
+- Pin generated artifacts/commit SHAs of the other service (e.g., `go.mod replace`, lockfiles).
+- Provide a thin, client-only package per service (client SDK) that you publish independently and pin.
+- Add breaking-change CI checks to catch accidental schema changes early.
+
+## CI checklist (practical)
+
+- Lint IDLs (`buf lint`, `spectral` for OpenAPI)
+- Run compatibility checks (`buf breaking`, `openapi-diff`)
+- Generate SDKs and run unit tests for generated packages
+- Publish packages with correct semver and release notes
+
+## TL;DR (short checklist)
+
+- Centralize IDLs in `apis/` repo.
+- Codegen + publish language SDKs with CI.
+- Services depend on released SDK versions, not each other's builds.
+- Prefer additive changes; use breaking checks.
+
+## Example: small `apis/` repo you can clone locally
+
+If you want, I can sketch a tiny `apis/` repository (proto files + Makefile + CI example) you can clone and run locally to test the flow. It would include a Go and a TypeScript example, and a small CI script that runs `buf lint` and `protoc`.
+
+This pattern dramatically reduces the accidental coupling between services and makes API changes predictable. Treat your API contract like any other library: version it, test it, and let services upgrade intentionally.
+
+## FAQ — common questions about centralizing IDLs (12 answers)
+
+### 1) What exactly is an IDL?
+
+An IDL (Interface Definition Language) is the machine-readable contract that describes your API surface — for example, Protobuf (.proto) or OpenAPI (YAML/JSON). It defines messages, methods, paths, and types that clients and servers agree to.
+
+### 2) Why separate repository instead of per-service specs?
+
+Centralizing avoids duplicated ownership and prevents each service from generating the other's client during its build. It enables consistent linting, breaking-change checks, and versioned SDK publishing under CI.
+
+### 3) How do I version generated SDKs?
+
+Tag releases in the `apis/` repo and publish generated packages per language with semantic versions (e.g., `v1.3.0`). Services depend on these artifacts and upgrade by updating the dependency version.
+
+### 4) Won't that create another package to manage?
+
+Yes — but treating API contracts as libraries is intentional: it turns ad-hoc coupling into a well-scoped dependency with release notes, tests, and explicit upgrades.
+
+### 5) How does this avoid circular upgrades?
+
+Services no longer build the other's client on the fly. They consume published, pinned SDKs; upgrades happen when a team intentionally bumps the dependency, breaking the rapid A→B→A churn.
+
+### 6) Isn't protobuf always backwards-compatible?
+
+Protobuf encourages additive changes (safe), but it can be broken by renaming fields, reusing tags, or removing fields without reserving tags/names. Use `reserved` and run `buf breaking` checks.
+
+### 7) What about OpenAPI/REST compatibility?
+
+OpenAPI doesn't enforce semantics; teams must adopt discipline: additive changes, deprecations, and compatibility checks (`openapi-diff`, contract tests). Centralization helps enforce those rules via CI.
+
+### 8) How do I handle breaking changes if they are necessary?
+
+Create a new major/minor API version (e.g., `a/v2`) and publish SDKs for both v1 and v2. Migrate clients incrementally. Document changes and provide a migration guide.
+
+### 9) How do I test generated SDKs?
+
+In the `apis/` repo CI, generate SDKs and run unit tests that validate the generated types and any handwritten helpers. Optionally publish snapshots to a staging registry and run consumer contract tests in downstream services.
+
+### 10) How to manage multi-language packaging?
+
+CI should run language-specific pipelines: build Go modules, run `npm` packaging for TypeScript, push wheels for Python, etc. Treat each generated SDK as its own packaged artifact.
+
+### 11) What if teams need small, local changes for a release?
+
+Use short-lived feature branches and pre-release artifacts (prerelease semvers) or pin to a commit SHA in the consuming service while the SDK is stabilized. Prefer not to rely on long-lived forks of generated code.
+
+### 12) How do I migrate from a service-owned-spec model?
+
+1. Create the `apis/` repo and migrate canonical specs there. 2) Add CI checks and basic packaging. 3) Publish an initial SDK release matching current behavior. 4) Switch services to depend on the published SDKs, pin versions, and remove local generation.

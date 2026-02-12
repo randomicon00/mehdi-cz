@@ -1,0 +1,29 @@
+---
+title: "TIL: How to List All Programs Installed in Your Command Line"
+date: "2024-12-27"
+tags: ["linux", "command line", "programs", "2024"]
+draft: false
+summary: Learn how to list all programs installed on your Linux system using the command line with package manager-specific commands.
+---
+
+You can easily see all the installed programs on your Linux system using your package manager. Here’s how:
+
+**For Debian/Ubuntu (APT)**:
+
+```bash
+dpkg --list
+```
+
+**For Fedora (DNF)**:
+
+```bash
+dnf list installed
+```
+
+**For Arch Linux (Pacman)**:
+
+```bash
+pacman -Q
+```
+
+These commands will show you a complete list of installed packages, helping you keep track of your software setup.

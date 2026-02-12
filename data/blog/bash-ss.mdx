@@ -1,0 +1,14 @@
+---
+title: "Show listening sockets with ss"
+
+date: "2025-09-16"
+tags: ["bash", "til"]
+draft: false
+summary: "ss inspects sockets; use -ltnp to list TCP listening ports with processes."
+---
+
+```bash
+ss -ltnp
+```
+
+Tip: `ss -tunap` shows UDP and all processes (may require root).

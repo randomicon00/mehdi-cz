@@ -1,0 +1,434 @@
+---
+title: "Today I Learnt: Python Type Hints and Annotations"
+date: "2025-09-15"
+tags: ["python", "type-hints", "type-annotations", "static-typing", "til"]
+draft: false
+summary: "Exploring Python's type hinting system - from basic annotations to advanced generic types, protocols, and runtime type checking that improves code quality and developer experience."
+---
+
+# Today I Learnt: Python Type Hints and Annotations
+
+Python's type hinting system, introduced in PEP 484 and enhanced through subsequent PEPs, allows you to add type annotations to your code. While Python remains dynamically typed, type hints improve code readability, catch errors early, and enhance IDE support.
+
+## Basic Type Annotations
+
+```python
+# Function with type hints
+def greet(name: str, age: int) -> str:
+    return f"Hello {name}, you are {age} years old"
+
+# Variable annotations
+user_name: str = "John"
+user_age: int = 25
+is_active: bool = True
+```
+
+## Built-in Types
+
+```python
+from typing import List, Dict, Tuple, Set, Optional, Union
+
+# Collections
+names: List[str] = ["Alice", "Bob", "Charlie"]
+user_data: Dict[str, Union[str, int]] = {"name": "John", "age": 30}
+coordinates: Tuple[float, float] = (10.5, 20.3)
+unique_ids: Set[int] = {1, 2, 3, 4}
+
+# Optional types (can be None)
+def find_user(user_id: int) -> Optional[Dict[str, str]]:
+    # Implementation
+    pass
+
+# Union types (multiple possible types)
+def process_data(data: Union[str, List[str], Dict[str, str]]) -> str:
+    if isinstance(data, str):
+        return data.upper()
+    elif isinstance(data, list):
+        return " ".join(data)
+    elif isinstance(data, dict):
+        return " ".join(data.values())
+    else:
+        raise ValueError("Unsupported data type")
+```
+
+## Advanced Type Features
+
+### Generic Types
+
+```python
+from typing import TypeVar, Generic
+
+T = TypeVar('T')  # Generic type variable
+K = TypeVar('K')  # Key type
+V = TypeVar('V')  # Value type
+
+class Stack(Generic[T]):
+    def __init__(self):
+        self.items: List[T] = []
+
+    def push(self, item: T) -> None:
+        self.items.append(item)
+
+    def pop(self) -> T:
+        return self.items.pop()
+
+    def peek(self) -> T:
+        return self.items[-1]
+
+# Usage
+string_stack: Stack[str] = Stack()
+number_stack: Stack[int] = Stack()
+
+class Dictionary(Generic[K, V]):
+    def __init__(self):
+        self.data: Dict[K, V] = {}
+
+    def set(self, key: K, value: V) -> None:
+        self.data[key] = value
+
+    def get(self, key: K) -> V:
+        return self.data[key]
+```
+
+### Callable Types
+
+```python
+from typing import Callable
+
+# Function type annotations
+def apply_operation(x: int, y: int, operation: Callable[[int, int], int]) -> int:
+    return operation(x, y)
+
+def add(a: int, b: int) -> int:
+    return a + b
+
+def multiply(a: int, b: int) -> int:
+    return a * b
+
+# Usage
+result1 = apply_operation(5, 3, add)        # 8
+result2 = apply_operation(5, 3, multiply)   # 15
+
+# More complex callable types
+CallbackFunction = Callable[[str], None]
+ErrorHandler = Callable[[Exception], None]
+
+def process_with_callbacks(
+    data: str,
+    on_success: CallbackFunction,
+    on_error: ErrorHandler
+) -> None:
+    try:
+        # Process data
+        processed_data = data.upper()
+        on_success(processed_data)
+    except Exception as e:
+        on_error(e)
+```
+
+### Literal Types
+
+```python
+from typing import Literal
+
+# Literal types restrict values to specific constants
+def set_theme(theme: Literal['light', 'dark', 'auto']) -> None:
+    print(f"Setting theme to: {theme}")
+
+def create_button(
+    variant: Literal['primary', 'secondary', 'danger'],
+    size: Literal['sm', 'md', 'lg']
+) -> str:
+    return f"Button: {variant} {size}"
+
+# Usage
+set_theme('light')        # ✅ Valid
+set_theme('blue')         # ❌ Type error
+
+create_button('primary', 'md')  # ✅ Valid
+create_button('outline', 'md')  # ❌ Type error
+```
+
+## Protocols and Structural Typing
+
+```python
+from typing import Protocol
+
+class Drawable(Protocol):
+    def draw(self, canvas: 'Canvas') -> None:
+        ...
+
+class Resizable(Protocol):
+    def resize(self, width: int, height: int) -> None:
+        ...
+
+class Shape:
+    def __init__(self, x: int, y: int):
+        self.x = x
+        self.y = y
+
+    def draw(self, canvas: 'Canvas') -> None:
+        print(f"Drawing shape at ({self.x}, {self.y})")
+
+    def resize(self, width: int, height: int) -> None:
+        print(f"Resizing to {width}x{height}")
+
+def render_shape(shape: Drawable) -> None:
+    canvas = Canvas()
+    shape.draw(canvas)
+
+def resize_object(obj: Resizable, width: int, height: int) -> None:
+    obj.resize(width, height)
+
+# Usage - any object with the right methods works
+shape = Shape(10, 20)
+render_shape(shape)      # ✅ Works
+resize_object(shape, 100, 50)  # ✅ Works
+```
+
+## Advanced Patterns
+
+### Overloaded Functions
+
+```python
+from typing import overload
+
+@overload
+def process_data(data: str) -> str:
+    ...
+
+@overload
+def process_data(data: List[str]) -> List[str]:
+    ...
+
+@overload
+def process_data(data: Dict[str, str]) -> Dict[str, str]:
+    ...
+
+def process_data(data):
+    if isinstance(data, str):
+        return data.upper()
+    elif isinstance(data, list):
+        return [item.upper() for item in data]
+    elif isinstance(data, dict):
+        return {k: v.upper() for k, v in data.items()}
+    else:
+        raise TypeError("Unsupported data type")
+
+# Usage with proper type inference
+result1: str = process_data("hello")                    # "HELLO"
+result2: List[str] = process_data(["a", "b", "c"])     # ["A", "B", "C"]
+result3: Dict[str, str] = process_data({"a": "1", "b": "2"})  # {"a": "1", "b": "2"}
+```
+
+### Generic Constraints
+
+```python
+from typing import TypeVar
+
+# Constrained type variables
+NumberType = TypeVar('NumberType', int, float, complex)
+
+def add_numbers(a: NumberType, b: NumberType) -> NumberType:
+    return a + b
+
+# Usage
+result1: int = add_numbers(1, 2)          # 3
+result2: float = add_numbers(1.5, 2.5)    # 4.0
+
+# Bound type variables
+class Animal:
+    def speak(self) -> str:
+        return "Some sound"
+
+class Dog(Animal):
+    def speak(self) -> str:
+        return "Woof!"
+
+class Cat(Animal):
+    def speak(self) -> str:
+        return "Meow!"
+
+AnimalType = TypeVar('AnimalType', bound=Animal)
+
+def make_animal_speak(animal: AnimalType) -> str:
+    return animal.speak()
+
+# Usage
+dog = Dog()
+cat = Cat()
+print(make_animal_speak(dog))  # "Woof!"
+print(make_animal_speak(cat))  # "Meow!"
+```
+
+### Type Guards
+
+```python
+from typing import TypeGuard
+
+def is_string(value: any) -> TypeGuard[str]:
+    return isinstance(value, str)
+
+def is_list_of_strings(value: any) -> TypeGuard[List[str]]:
+    return isinstance(value, list) and all(isinstance(item, str) for item in value)
+
+def process_value(value: Union[str, List[str], int]) -> str:
+    if is_string(value):
+        # TypeScript knows value is string here
+        return value.upper()
+    elif is_list_of_strings(value):
+        # TypeScript knows value is List[str] here
+        return " ".join(value)
+    else:
+        # value must be int
+        return str(value)
+
+# Usage
+result1 = process_value("hello")          # "HELLO"
+result2 = process_value(["a", "b", "c"])  # "a b c"
+result3 = process_value(42)               # "42"
+```
+
+## Runtime Type Checking
+
+```python
+import inspect
+from typing import get_type_hints
+
+def validate_function_args(func, *args, **kwargs):
+    """Runtime type validation for function arguments"""
+    sig = inspect.signature(func)
+    type_hints = get_type_hints(func)
+
+    # Bind arguments to parameters
+    bound_args = sig.bind(*args, **kwargs)
+    bound_args.apply_defaults()
+
+    for param_name, value in bound_args.arguments.items():
+        if param_name in type_hints:
+            expected_type = type_hints[param_name]
+            if not isinstance(value, expected_type):
+                raise TypeError(
+                    f"Parameter '{param_name}' must be of type {expected_type.__name__}, "
+                    f"got {type(value).__name__}"
+                )
+
+def type_checked(func):
+    """Decorator for runtime type checking"""
+    def wrapper(*args, **kwargs):
+        validate_function_args(func, *args, **kwargs)
+        return func(*args, **kwargs)
+    return wrapper
+
+@type_checked
+def add_numbers(a: int, b: int) -> int:
+    return a + b
+
+# Usage
+result = add_numbers(5, 3)        # ✅ Works
+# add_numbers(5, "3")            # ❌ TypeError at runtime
+```
+
+## Integration with Popular Libraries
+
+### Pydantic for Data Validation
+
+```python
+from pydantic import BaseModel, validator
+from typing import Optional
+
+class User(BaseModel):
+    id: int
+    name: str
+    email: str
+    age: Optional[int] = None
+
+    @validator('email')
+    def email_must_be_valid(cls, v):
+        if '@' not in v:
+            raise ValueError('Invalid email')
+        return v
+
+    @validator('age')
+    def age_must_be_positive(cls, v):
+        if v is not None and v < 0:
+            raise ValueError('Age must be positive')
+        return v
+
+# Usage
+user = User(id=1, name="John", email="john@example.com", age=25)
+print(user.dict())  # {'id': 1, 'name': 'John', 'email': 'john@example.com', 'age': 25}
+
+# Validation errors
+try:
+    invalid_user = User(id=1, name="John", email="invalid-email", age=-5)
+except Exception as e:
+    print(e)  # Validation error details
+```
+
+### FastAPI for Web APIs
+
+```python
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from typing import List, Optional
+
+app = FastAPI()
+
+class Item(BaseModel):
+    id: int
+    name: str
+    price: float
+    description: Optional[str] = None
+    tax: Optional[float] = None
+
+class ItemCreate(BaseModel):
+    name: str
+    price: float
+    description: Optional[str] = None
+
+items_db = []
+
+@app.post("/items/", response_model=Item)
+async def create_item(item: ItemCreate):
+    new_item = Item(
+        id=len(items_db) + 1,
+        name=item.name,
+        price=item.price,
+        description=item.description
+    )
+    items_db.append(new_item)
+    return new_item
+
+@app.get("/items/", response_model=List[Item])
+async def read_items():
+    return items_db
+
+@app.get("/items/{item_id}", response_model=Item)
+async def read_item(item_id: int):
+    for item in items_db:
+        if item.id == item_id:
+            return item
+    raise HTTPException(status_code=404, detail="Item not found")
+```
+
+## Best Practices
+
+1. **Start Simple**: Begin with basic type hints and gradually add complexity
+2. **Use Meaningful Names**: Choose descriptive names for type variables
+3. **Document Complex Types**: Add comments for complex type annotations
+4. **Leverage IDE Support**: Use type hints to get better autocomplete and error detection
+5. **Combine with Testing**: Type hints complement but don't replace unit tests
+6. **Consider Performance**: Type checking has minimal runtime overhead
+7. **Stay Up-to-Date**: Follow the latest typing PEPs and best practices
+8. **Use Type Checking Tools**: Integrate mypy or pyright for static type checking
+
+## Tools and Libraries
+
+- **mypy**: Static type checker for Python
+- **pyright**: Microsoft's type checker
+- **Pydantic**: Data validation and parsing
+- **FastAPI**: Modern web framework with automatic type validation
+- **typing_extensions**: Backports of newer typing features
+
+Type hints in Python provide a powerful way to make your code more maintainable, self-documenting, and less prone to runtime errors. While optional, they significantly improve the developer experience and code quality when used effectively.

@@ -1,0 +1,40 @@
+---
+title: "UTF-16 vs Unicode Code Points in JavaScript: Understanding String Lengths"
+date: "2025-02-18"
+tags: ["javascript", "unicode", "utf-16", "code points"]
+draft: false
+summary: "A concise guide to understanding the difference between UTF-16 code units and Unicode code points in JavaScript, explaining why string length can be misleading with multi-byte characters."
+---
+
+When working with strings in JavaScript, you may have encountered unexpected results when measuring string length, especially with multi-byte characters like emojis. This happens due to JavaScript's internal string encoding using **UTF-16**. Let’s dive into why this encoding can lead to confusion and how to accurately count characters.
+
+### UTF-16 and Code Units
+
+JavaScript uses **UTF-16** encoding for strings, where each character is represented as one or more **code units**, each 16 bits (2 bytes) long. For most Latin characters, a single code unit suffices, but for complex characters like emojis, JavaScript requires two code units to represent one visible character.
+
+For example:
+
+```javascript
+"💩".length; // Returns 2, because "💩" is represented as two UTF-16 code units
+```
+
+### Unicode Code Points and Visible Characters
+
+A Unicode code point represents an actual visible character, regardless of how many UTF-16 code units it needs in memory. JavaScript provides a way to count code points using the spread syntax (`...`) or `Array.from`, which breaks the string into an array of visible characters (code points) rather than code units.
+
+Example:
+
+```javascript
+[..."💩"].length; // Returns 1, treating "💩" as a single code point
+```
+
+### Why This Matters
+
+When you want an accurate character count, particularly for user-facing character limits, `str.length` can be misleading. Using `[...str].length` or `Array.from(str).length` correctly counts visible characters, ensuring multi-byte characters like emojis are counted as single units.
+
+### Summary
+
+- **UTF-16 Code Units**: JavaScript’s `str.length` measures these, so multi-byte characters count as more than one.
+- **Unicode Code Points**: Using `[...str]` counts visible characters accurately, ideal for string limits.
+
+By understanding the difference between UTF-16 code units and Unicode code points, you can handle strings in JavaScript more precisely, especially with diverse characters in modern applications.

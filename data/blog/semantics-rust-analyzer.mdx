@@ -1,0 +1,307 @@
+---
+title: "Rust Analyzer: Source to Definiton Deep Dive"
+date: "2025-02-20"
+tags: ["rust", "macros", "declarative", "procedural", "derive"]
+draft: true
+summary: Rust provides powerful macros that allow for metaprogramming, enabling developers to write code that generates other code.
+---
+
+The algorithm described in this module is used to map syntax nodes to their corresponding semantic definitions. This is a crucial part of IDE functionality, allowing features like "go to definition" to work correctly.
+
+## Algorithm Steps
+
+- Find the syntactic container for the syntax node.
+- Recursively get the definition (def) corresponding to the container.
+- Ask the container def for all child defs.
+- For each child def, ask for its source.
+- The child def whose source matches the original syntax node is the answer.
+
+## Key Points
+
+The algorithm is recursive.
+It uses an inverse approach (what is the syntax for this def?).
+The recursion stops at the file syntax node, which doesn't have a syntactic parent.
+
+## Real-life Code Example
+
+Let's look at a simplified version of how this algorithm might be implemented in rust-analyzer:
+
+```rust
+use syntax::{AstNode, SyntaxNode};
+use hir_def::{ModuleId, DefWithBodyId};
+
+struct SourceToDefCtx<'db> {
+    db: &'db dyn HirDatabase,
+    // ... other fields ...
+}
+
+impl<'db> SourceToDefCtx<'db> {
+    fn source_to_def(&mut self, node: &SyntaxNode) -> Option<DefWithBodyId> {
+        // Step 1: Find the syntactic container
+        let container = self.find_container(node)?;
+
+        // Step 2: Recursively get the def for the container
+        let container_def = self.container_to_def(container)?;
+
+        // Step 3: Get all child defs from the container
+        let child_defs = self.db.child_defs(container_def);
+
+        // Steps 4 & 5: Find the child def whose source matches our node
+        child_defs.into_iter().find(|&child_def| {
+            let child_source = self.db.lookup_source(child_def);
+            child_source.syntax() == node
+        })
+    }
+
+    fn find_container(&self, node: &SyntaxNode) -> Option<SyntaxNode> {
+        node.ancestors().find(|n| self.is_container(n))
+    }
+
+    fn container_to_def(&mut self, container: SyntaxNode) -> Option<DefWithBodyId> {
+        if let Some(function) = ast::Fn::cast(container.clone()) {
+            self.fn_to_def(function)
+        } else if let Some(module) = ast::Module::cast(container) {
+            self.module_to_def(module).map(DefWithBodyId::from)
+        } else {
+            // Handle other types of containers...
+            None
+        }
+    }
+
+    fn fn_to_def(&mut self, func: ast::Fn) -> Option<DefWithBodyId> {
+        // Implementation to convert ast::Fn to FunctionId
+        // ...
+    }
+
+    fn module_to_def(&mut self, module: ast::Module) -> Option<ModuleId> {
+        // Implementation to convert ast::Module to ModuleId
+        // ...
+    }
+
+    // Other helper methods...
+}
+```
+
+In this example:
+
+1. `source_to_def` is the main entry point, implementing the algorithm.
+2. `find_container` finds the syntactic container for a given node.
+3. `container_to_def` converts a container syntax node to its corresponding def.
+4. Helper methods like `fn_to_def` and `module_to_def` handle specific conversions.
+
+This implementation demonstrates how the algorithm recursively navigates the syntax tree, converts containers to defs, and ultimately finds the specific def that corresponds to the original syntax node.
+
+The actual implementation in rust-analyzer is more complex, handling various edge cases, caching results for performance, and dealing with macro expansions. However, this simplified version captures the essence of the algorithm described in the module.
+
+## Example Output of `file_to_def` Function
+
+Let's consider the following project structure:
+
+```
+my_project/
+├── Cargo.toml
+└── src/
+    ├── lib.rs
+    ├── main.rs
+    └── utils.rs
+```
+
+With the following content:
+
+```rust
+// src/lib.rs
+mod utils;
+
+pub fn library_function() {
+    utils::helper_function();
+}
+
+// src/main.rs
+use my_project::library_function;
+mod utils;
+
+fn main() {
+    library_function();
+    utils::helper_function();
+}
+
+// src/utils.rs
+pub(crate) fn helper_function() {
+    println!("Helper function called");
+}
+```
+
+Now, let's consider what `file_to_def` might return when called with the `FileId` corresponding to `utils.rs`:
+
+```rust
+let file_id = FileId::new(/* some internal ID for utils.rs */);
+let module_ids = source_to_def_ctx.file_to_def(file_id);
+```
+
+The `file_to_def` function would return a `&SmallVec<[ModuleId; 1]>` containing two `ModuleId`s:
+
+1. A `ModuleId` representing the `utils` module in the context of the library crate (defined in `lib.rs`).
+2. A `ModuleId` representing the `utils` module in the context of the binary crate (defined in `main.rs`).
+
+In pseudo-code, the result might look something like this:
+
+```rust
+SmallVec[
+    ModuleId {
+        crate_id: CrateId(0), // Assuming 0 represents the library crate
+        local_id: LocalModuleId(2) // Assuming 2 is the local ID for utils in the library crate
+    },
+    ModuleId {
+        crate_id: CrateId(1), // Assuming 1 represents the binary crate
+        local_id: LocalModuleId(1) // Assuming 1 is the local ID for utils in the binary crate
+    }
+]
+```
+
+Each `ModuleId` uniquely identifies the `utils` module in its respective crate context. The `CrateId` distinguishes between the library and binary crates, while the `LocalModuleId` identifies the specific module within that crate.
+
+This result allows rust-analyzer to understand that `utils.rs` defines a module that exists in two different contexts (the library and binary crates). When performing operations like "Go to Definition" or code completion, rust-analyzer can use this information to provide accurate results regardless of whether the user is working in the context of the library or the binary crate.
+
+# Rust File Relationship Algorithm in rust-analyzer
+
+## Complex Scenario
+
+Consider the following project structure:
+
+```
+my_project/
+├── Cargo.toml
+├── src/
+│   ├── lib.rs
+│   ├── main.rs
+│   ├── module_a/
+│   │   ├── mod.rs
+│   │   └── submodule.rs
+│   └── module_b.rs
+└── tests/
+    └── integration_test.rs
+```
+
+## File Contents
+
+```rust
+// src/lib.rs
+mod module_a;
+mod module_b;
+
+pub use module_a::submodule::public_function;
+
+// src/main.rs
+use my_project::public_function;
+
+fn main() {
+    public_function();
+}
+
+// src/module_a/mod.rs
+pub mod submodule;
+
+// src/module_a/submodule.rs
+pub fn public_function() {
+    println!("Called public_function");
+}
+
+// src/module_b.rs
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn internal_test() {
+        assert!(true);
+    }
+}
+
+// tests/integration_test.rs
+use my_project::public_function;
+
+#[test]
+fn test_public_function() {
+    public_function();
+}
+```
+
+## Algorithm for Determining File Relationships
+
+1. **Crate Structure Analysis**:
+
+   - rust-analyzer first determines the crate structure by analyzing `Cargo.toml` and the presence of `lib.rs` and `main.rs`.
+   - In this case, it identifies both a library crate (`lib.rs`) and a binary crate (`main.rs`).
+
+2. **Module Tree Construction**:
+
+   - Starting from `lib.rs` and `main.rs`, rust-analyzer constructs the module tree by following `mod` declarations.
+   - It identifies `module_a` and `module_b` as submodules of the library crate.
+
+3. **File Resolution**:
+
+   - For each `mod` declaration, rust-analyzer resolves the corresponding file:
+     - `module_a` resolves to `src/module_a/mod.rs`
+     - `module_b` resolves to `src/module_b.rs`
+   - Inside `module_a/mod.rs`, it resolves `submodule` to `src/module_a/submodule.rs`
+
+4. **Use Declaration Analysis**:
+
+   - rust-analyzer analyzes `use` declarations to understand cross-module relationships.
+   - It sees that `lib.rs` re-exports `public_function` from `module_a::submodule`.
+
+5. **Test Module Identification**:
+
+   - rust-analyzer identifies test modules, including the `#[cfg(test)]` module in `module_b.rs` and the integration test in `tests/integration_test.rs`.
+
+6. **Conditional Compilation Consideration**:
+
+   - It takes note of any `#[cfg()]` attributes, like the one in `module_b.rs`, to understand which parts of the code are conditionally compiled.
+
+7. **Dependency Graph Construction**:
+   - Based on all this information, rust-analyzer constructs a dependency graph showing how files and modules relate to each other.
+
+## What `file_to_def` Would Return
+
+Now, let's look at what `file_to_def` might return for different files:
+
+1. For `src/module_a/submodule.rs`:
+
+   ```rust
+   SmallVec[
+       ModuleId {
+           crate_id: CrateId(0), // library crate
+           local_id: LocalModuleId(3) // submodule of module_a
+       },
+       ModuleId {
+           crate_id: CrateId(2), // test crate (for integration tests)
+           local_id: LocalModuleId(1) // root module of test crate
+       }
+   ]
+   ```
+
+   This file is part of both the library crate and the integration test crate.
+
+2. For `src/module_b.rs`:
+
+   ```rust
+   SmallVec[
+       ModuleId {
+           crate_id: CrateId(0), // library crate
+           local_id: LocalModuleId(2) // module_b
+       }
+   ]
+   ```
+
+   This file is only part of the library crate.
+
+3. For `src/main.rs`:
+   ```rust
+   SmallVec[
+       ModuleId {
+           crate_id: CrateId(1), // binary crate
+           local_id: LocalModuleId(0) // root module of binary crate
+       }
+   ]
+   ```
+   This file defines the root module of the binary crate.
+
+The algorithm ensures that rust-analyzer understands the complex relationships between files, modules, and crates, allowing it to provide accurate information for IDE features like go-to-definition, find all references, and code completion.

@@ -1,0 +1,232 @@
+---
+title: "Active Menu Highlighting in Next.js with usePathname"
+date: "2025-12-27"
+tags: ["nextjs", "react", "ux", "til"]
+draft: false
+summary: "Quick guide to implementing active page indicators in your Next.js navigation using the usePathname hook. Better UX in 5 minutes."
+---
+
+# Active Menu Highlighting in Next.js with usePathname
+
+One of those small UX details that makes your site feel professional: highlighting the current page in your navigation menu. Here's how to do it in Next.js 14+ with App Router.
+
+## Why It Matters
+
+Active menu highlighting tells users where they are. Without it, your navigation feels disconnected. With it, your site feels polished and intuitive.
+
+## The Hook: usePathname
+
+Next.js provides `usePathname()` from `next/navigation`. It returns the current URL path as a string.
+
+```tsx
+import { usePathname } from "next/navigation";
+
+const pathname = usePathname();
+// On /blog → pathname = "/blog"
+// On /blog/my-post → pathname = "/blog/my-post"
+```
+
+## Basic Implementation
+
+Here's the simplest version for a desktop header:
+
+```tsx
+"use client";
+
+import { usePathname } from "next/navigation";
+import Link from "next/link";
+
+const navLinks = [
+  { href: "/blog", title: "Blog" },
+  { href: "/work", title: "Work" },
+  { href: "/contact", title: "Contact" },
+];
+
+export default function Header() {
+  const pathname = usePathname();
+
+  return (
+    <nav>
+      {navLinks.map((link) => {
+        const isActive = pathname === link.href;
+
+        return (
+          <Link
+            key={link.href}
+            href={link.href}
+            className={`
+              ${
+                isActive
+                  ? "border-b-2 border-blue-600 text-blue-600"
+                  : "text-gray-900 hover:text-blue-500"
+              }
+            `}
+          >
+            {link.title}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+```
+
+## Handling Nested Routes
+
+Problem: `/blog` shouldn't just match `/blog`, it should also match `/blog/my-post`.
+
+Solution: Use `startsWith()`:
+
+```tsx
+const isActive = pathname === link.href || pathname.startsWith(link.href + "/");
+```
+
+This activates `/blog` when you're on `/blog/my-post` but not when you're on `/bloggers` (note the trailing `/`).
+
+## Multiple Visual States
+
+You might want different styles for:
+
+- **Active page** (primary color + underline)
+- **Special CTA** (green color, always stands out)
+- **Normal links** (gray, neutral)
+
+```tsx
+const isActive = pathname === link.href || pathname.startsWith(link.href + "/");
+const isHire = link.href === "/hire";
+
+return (
+  <Link
+    href={link.href}
+    className={`
+      ${
+        isHire
+          ? `font-semibold text-green-600
+           ${isActive ? "border-b-2 border-green-600" : ""}`
+          : isActive
+            ? "border-b-2 border-blue-600 text-blue-600"
+            : "text-gray-900 hover:text-blue-500"
+      }
+    `}
+  >
+    {link.title}
+  </Link>
+);
+```
+
+This keeps your CTA green (special) while still showing active state with an underline.
+
+## Mobile vs Desktop Styling
+
+**Desktop**: Bottom border (underline)
+**Mobile**: Left border (vertical indicator)
+
+```tsx
+// Desktop (Header.tsx)
+className={isActive
+  ? 'text-blue-600 border-b-2 border-blue-600'
+  : 'text-gray-900'
+}
+
+// Mobile (MobileNav.tsx)
+className={isActive
+  ? 'text-blue-600 border-l-4 border-blue-600 pl-8'
+  : 'text-gray-900'
+}
+```
+
+The `pl-8` (padding-left) on mobile compensates for the 4px border so text doesn't shift.
+
+## Important: Client Component
+
+`usePathname()` only works in Client Components. Add `"use client"` at the top:
+
+```tsx
+"use client";
+
+import { usePathname } from "next/navigation";
+// ... rest of your component
+```
+
+## Complete Working Example
+
+Here's what I use on this site:
+
+```tsx
+"use client";
+
+import { usePathname } from "next/navigation";
+import Link from "./Link";
+import headerNavLinks from "@/data/headerNavLinks";
+
+export default function Header() {
+  const pathname = usePathname();
+
+  return (
+    <header>
+      <nav>
+        {headerNavLinks
+          .filter((link) => link.href !== "/")
+          .map((link) => {
+            const isActive = pathname === link.href || pathname.startsWith(link.href + "/");
+            const isHire = link.href === "/hire";
+
+            return (
+              <Link
+                key={link.title}
+                href={link.href}
+                className={`block font-medium ${
+                  isHire
+                    ? `font-semibold text-green-600 hover:text-green-700
+                       ${isActive ? "border-b-2 border-green-600" : ""}`
+                    : isActive
+                      ? "border-b-2 border-primary-500 text-primary-500"
+                      : "text-gray-900 hover:text-primary-500"
+                }`}
+              >
+                {link.title}
+              </Link>
+            );
+          })}
+      </nav>
+    </header>
+  );
+}
+```
+
+## Testing
+
+Navigate between pages and check:
+
+- ✅ Active page shows highlight
+- ✅ Nested routes activate parent (e.g., `/blog/post` highlights "Blog")
+- ✅ Only one item highlighted at a time
+- ✅ Special CTAs maintain their color
+- ✅ Works on both mobile and desktop
+
+## Common Gotchas
+
+**"My component isn't updating!"**
+
+- Did you add `"use client"` at the top?
+
+**"All my blog posts highlight 'Blog' in the menu"**
+
+- Good! That's the `startsWith()` logic working correctly.
+
+**"`usePathname` is not a function"**
+
+- Import from `next/navigation`, not `next/router` (old Pages Router).
+
+**"The highlight flashes on page load"**
+
+- Normal with client components. You can use CSS transitions to smooth it:
+  ```css
+  transition: border-color 200ms ease-in-out;
+  ```
+
+## That's It
+
+Five-minute implementation, professional-looking navigation. This is one of those small touches that makes your site feel complete.
+
+For more Next.js patterns, check out the [Next.js docs on usePathname](https://nextjs.org/docs/app/api-reference/functions/use-pathname).

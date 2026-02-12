@@ -1,0 +1,145 @@
+---
+title: "Vector Embeddings for Code Search and Similarity"
+date: "2025-09-16"
+tags: ["ai", "embeddings", "code-search", "similarity"]
+draft: false
+summary: "Build intelligent code search systems using vector embeddings to find similar functions, detect duplicates, and discover reusable components."
+---
+
+Use vector embeddings to create semantic code search that understands functionality rather than just matching text strings.
+
+## Creating Code Embeddings
+
+```python
+import openai
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
+import ast
+
+def get_code_embedding(code_snippet):
+    """Generate embedding for code snippet"""
+    response = openai.Embedding.create(
+        model="text-embedding-ada-002",
+        input=code_snippet
+    )
+    return np.array(response['data'][0]['embedding'])
+
+def extract_functions(file_path):
+    """Extract all functions from a Python file"""
+    with open(file_path, 'r') as f:
+        tree = ast.parse(f.read())
+
+    functions = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef):
+            # Get function source code
+            start_line = node.lineno - 1
+            end_line = node.end_lineno if hasattr(node, 'end_lineno') else start_line + 10
+
+            with open(file_path, 'r') as f:
+                lines = f.readlines()
+                func_code = ''.join(lines[start_line:end_line])
+
+            functions.append({
+                'name': node.name,
+                'code': func_code,
+                'file': file_path,
+                'line': node.lineno
+            })
+
+    return functions
+
+# Build embedding database
+def build_code_database(project_paths):
+    code_db = []
+
+    for path in project_paths:
+        functions = extract_functions(path)
+        for func in functions:
+            embedding = get_code_embedding(func['code'])
+            func['embedding'] = embedding
+            code_db.append(func)
+
+    return code_db
+```
+
+## Semantic Code Search
+
+```python
+def search_similar_code(query_code, code_database, top_k=5):
+    """Find similar code snippets using embeddings"""
+    query_embedding = get_code_embedding(query_code)
+
+    similarities = []
+    for item in code_database:
+        similarity = cosine_similarity(
+            [query_embedding],
+            [item['embedding']]
+        )[0][0]
+
+        similarities.append((similarity, item))
+
+    # Sort by similarity and return top matches
+    similarities.sort(key=lambda x: x[0], reverse=True)
+    return similarities[:top_k]
+
+# Example usage
+query = """
+def calculate_total_price(items):
+    total = 0
+    for item in items:
+        total += item.price * item.quantity
+    return total
+"""
+
+similar_functions = search_similar_code(query, code_database)
+
+for similarity, func in similar_functions:
+    print(f"Similarity: {similarity:.3f}")
+    print(f"Function: {func['name']} in {func['file']}")
+    print(f"Code: {func['code'][:100]}...")
+    print("---")
+```
+
+## Duplicate Code Detection
+
+```python
+def find_duplicate_code(code_database, similarity_threshold=0.9):
+    """Find potentially duplicate code snippets"""
+    duplicates = []
+
+    for i, item1 in enumerate(code_database):
+        for j, item2 in enumerate(code_database[i+1:], i+1):
+            similarity = cosine_similarity(
+                [item1['embedding']],
+                [item2['embedding']]
+            )[0][0]
+
+            if similarity > similarity_threshold:
+                duplicates.append({
+                    'similarity': similarity,
+                    'func1': item1,
+                    'func2': item2
+                })
+
+    return sorted(duplicates, key=lambda x: x['similarity'], reverse=True)
+
+# Code reuse recommendations
+def suggest_reusable_components(new_code, code_database):
+    """Suggest existing functions that could be reused"""
+    similar_code = search_similar_code(new_code, code_database, top_k=3)
+
+    suggestions = []
+    for similarity, func in similar_code:
+        if similarity > 0.7:  # High similarity threshold
+            suggestions.append({
+                'function': func['name'],
+                'file': func['file'],
+                'similarity': similarity,
+                'suggestion': f"Consider reusing {func['name']} from {func['file']}"
+            })
+
+    return suggestions
+```
+
+**Pro tip:** Update embeddings incrementally as code changes and use metadata filtering to improve search relevance.

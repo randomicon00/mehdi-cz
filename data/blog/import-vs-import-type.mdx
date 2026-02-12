@@ -1,0 +1,113 @@
+---
+title: "Understanding the Difference Between 'import type' and Regular 'import' in TypeScript"
+date: "2025-02-21"
+tags: ["typescript", "imports", "optimization", "frontend", "javascript"]
+draft: false
+summary: "An explanation of the differences between 'import type' and regular 'import' in TypeScript, highlighting their impact on runtime code, type-checking, and project optimization."
+---
+
+In TypeScript, there is a subtle but important difference between using `import type` and a regular `import` statement when importing types in a `.tsx` or `.ts` project. Here's the explanation:
+
+## `import type`
+
+### Purpose
+
+`import type` is used exclusively to import types and interfaces, ensuring that no actual code (like functions, constants, or classes) is included in the compiled JavaScript.
+
+### Effect
+
+When you use `import type`, TypeScript knows you're only interested in importing type information for type checking and not runtime values. This helps in optimizing the output, as no runtime code from that module will be included.
+
+```ts
+// This will ONLY import the types/interfaces, no runtime code
+import type { SomeType } from "./module";
+```
+
+### Usage
+
+Use `import type` when you are only importing types (not actual values like variables, functions, classes) and you want to ensure no runtime code is included from the module.
+
+### Example Use Case
+
+You're importing types/interfaces purely for type checking and don’t need any of the actual code from that file/module during runtime.
+
+```ts
+import type { MyInterface } from "./types"; // Only imports the type, not the actual runtime code.
+```
+
+This is useful in larger projects where you want to make it explicit that the import is only for types, and it can reduce the amount of unnecessary code in the final output.
+
+## Regular `import`
+
+### Purpose
+
+Regular `import` can be used to import both types and runtime values (like functions, classes, variables, etc.). If you use regular `import` for types, TypeScript will still only include them for type checking, but this import statement can also bring runtime values into your JavaScript code.
+
+```ts
+// This imports both types and potentially runtime values (like functions, variables, etc.)
+import { SomeType, someFunction } from "./module";
+```
+
+### Usage
+
+Use a regular `import` when you need both type information and runtime values (like functions, constants, or objects). If you're unsure whether the module you're importing will contain runtime code, using a regular import is the safe option.
+
+### Example Use Case
+
+When you import both a type and a function or value from the same file.
+
+```ts
+import { MyInterface, myFunction } from "./module"; // Imports both type and runtime function.
+```
+
+## When to use import type vs regular import:
+
+### Use import type when:
+
+- You are only importing types or interfaces for type checking, and no runtime code from the module is needed.
+- You want to ensure that no runtime side effects (such as executing code) will be included in the final output from that module.
+
+### Use regular import when:
+
+- You are importing a mix of types and values (e.g., functions, variables, or classes).
+- You are unsure whether the import will include runtime code that is needed.
+
+### Example Comparison:
+
+Let's assume you have a module user.ts:
+
+```ts
+// user.ts
+export type User = {
+  name: string;
+  age: number;
+};
+
+export const getUser = () => {
+  return { name: "John", age: 30 };
+};
+```
+
+#### Using import type:
+
+```ts
+import type { User } from "./user";
+
+// We can use the `User` type here, but `getUser` is not available.
+const logUser = (user: User) => console.log(user);
+```
+
+This will not include any runtime code from `user.ts` (like the `getUser` function) in the final JavaScript bundle, since import type only brings in the type information.
+
+#### Using regular `import`:
+
+```ts
+import { User, getUser } from "./user";
+
+// We can use both the `User` type and the `getUser` function here.
+const logUser = (user: User) => console.log(user);
+const user = getUser(); // Now we can call getUser.
+logUser(user);
+```
+
+This will include both the `User` type and the `getUser` function in the final JavaScript output.

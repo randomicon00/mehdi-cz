@@ -1,0 +1,74 @@
+---
+title: "How to Use `await` Inside `Vec::iter().map()` in an async fn"
+date: "2024-10-28"
+tags: ["rust", "async", "await", "map", "error handling"]
+draft: false
+summary: "Learn how to work with `await` inside `Vec::iter().map()` in Rust's async functions, and troubleshoot common issues with closures and error handling."
+---
+
+When working with Rust’s async features, especially inside functions that involve closures, newcomers and experienced developers alike often run into some tricky compile errors. In this article, we’ll explore how to handle `await` within a `.map()` call on a `Vec`, understand why certain errors arise, and discover effective solutions.
+
+Let’s start with the question: How can you use `await` in a closure within `.map()` in an async function? Here’s a look at the code in question:
+
+```rust
+#[derive(Debug)]
+struct B { val: u32 }
+
+impl B {
+    pub async fn do_b(&self) -> Result<u32, anyhow::Error> { Ok(1) }
+    pub fn do_c(&self) -> Result<u32, anyhow::Error> { Ok(2) }
+}
+
+// sum() is an async function, why can't we call await?
+async fn sum(arr: Vec<B>) -> Result<u32, anyhow::Error> {
+    let values: Vec<Result<u32, anyhow::Error>> = arr.iter().map(|b| b.do_b().await? ).collect();
+    Ok(0)
+}
+```
+
+Attempting to compile this raises two main issues:
+
+- **Error A**: `await` isn’t allowed inside `map()`.
+- **Error B**: Wrapping `await` in an async block results in a type mismatch due to the ? operator.
+
+Let’s unpack these errors and understand the solution.
+
+### Why Awaiting in map() Doesn’t Work Directly
+
+#### Error A: Why `await` Inside `.map()` Doesn’t Compile
+
+The first error, Error A, occurs because `.map()` cannot contain an `await`. The `await` keyword works only inside async functions or async blocks, and closures within `.map()` aren’t inherently `async`. To work around this, you need to make the entire closure an async block by wrapping it in `async { ... }`.
+
+#### Error B: Type Mismatch with `await` in an Async Block
+
+After converting to an async block, we encounter Error B. This error is due to the `?` operator inside an async closure. The `?` operator unwraps Result values, and since the async block requires a `Result` type, we need to adjust it by removing the `?` inside the async block and handling the `Result` after all async operations complete.
+
+### The Solution: Using `futures::future::try_join_all`
+
+To address both errors, we’ll utilize `futures::future::try_join_all`, a convenient async combinator that runs a collection of futures concurrently. This way, we can avoid `.map()` directly and still process each element in `arr` with `await`.
+
+Here’s the corrected code:
+
+```rust
+use anyhow::Error;
+use futures::future::try_join_all;
+
+#[derive(Debug)]
+struct B { val: u32 }
+
+impl B {
+    pub async fn do_b(&self) -> Result<u32, Error> { Ok(1) }
+    pub fn do_c(&self) -> Result<u32, Error> { Ok(2) }
+}
+
+async fn sum(arr: Vec<B>) -> Result<u32, Error> {
+    let futures = arr.iter().map(|b| b.do_b());
+    let values: Vec<u32> = try_join_all(futures).await?;
+    Ok(values.iter().sum())
+}
+```
+
+### Explanation
+
+- **try_join_all**: This function takes a list of futures and runs them in parallel, waiting for all to complete. If any future returns an error, `try_join_all` short-circuits and returns that error.
+- **Error Handling**: By using `try_join_all`, we aggregate results, and the function returns either a `Result<Vec<u32>, Error>` or an error immediately if any operation fails.

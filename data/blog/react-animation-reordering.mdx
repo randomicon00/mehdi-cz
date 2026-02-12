@@ -1,0 +1,117 @@
+---
+title: "Animating Element Reordering in React with requestAnimationFrame"
+date: "2025-01-27"
+tags: ["react", "requestAnimationFrame", "performance", "animation", "useref"]
+draft: false
+summary: Learn how to handle smooth element reordering in React using requestAnimationFrame to manage transitions and optimize performance, ensuring a visually appealing and responsive UI.
+---
+
+**TODO Add the github repository with the code example!**
+
+## Problem
+
+In React projects, dynamically reordering elements (like a list of items) can cause janky or unpleasant transitions if changes are applied abruptly. Achieving smooth, fluid animations requires tracking the current and previous positions of elements and applying offsets accordingly.
+
+Without proper synchronization between the DOM state and React re-renders, users may notice jumps or visual artifacts when items are rearranged. This problem worsens when handling large lists or complex layouts.
+
+## Solution
+
+To address this, we can combine React's `useLayoutEffect` and `requestAnimationFrame` to smoothly animate the reordering of list items. This approach ensures that changes are reflected only after the necessary DOM measurements are collected, and transitions happen in sync with the browser's rendering cycle.
+
+By capturing the top positions of the elements before and after reordering, we can compute the offsets required to animate the transition. `requestAnimationFrame` helps in resetting these offsets after the animation starts, allowing for a smooth visual effect.
+
+## Example Code
+
+```jsx
+import React, { useState, useRef, useLayoutEffect } from "react";
+
+const AnimatedReorderList = () => {
+  const [items, setItems] = useState(["Item A", "Item B", "Item C"]);
+  const [itemOffsets, setItemOffsets] = useState({});
+  const itemRefs = useRef({});
+  const itemTops = useRef({});
+
+  useLayoutEffect(() => {
+    const newItemOffsets = {};
+
+    items.forEach((item) => {
+      const itemRef = itemRefs.current[item];
+      if (itemRef) {
+        const currentTop = itemRef.getBoundingClientRect().top;
+        const prevTop = itemTops.current[item] || 0;
+        const offset = -(currentTop - prevTop);
+        newItemOffsets[item] = offset;
+      }
+    });
+
+    setItemOffsets(newItemOffsets);
+
+    // Reset offsets to animate transition
+    requestAnimationFrame(() => {
+      setItemOffsets({});
+    });
+  }, [items]);
+
+  const reorderItems = () => {
+    setItems([...items].reverse());
+  };
+
+  return (
+    <div className="flex h-screen items-center justify-center bg-gray-100">
+      <div>
+        <ol>
+          {items.map((item) => (
+            <li
+              key={item}
+              ref={(el) => (itemRefs.current[item] = el)}
+              className="my-2 rounded bg-blue-500 p-4 text-center text-white transition-all duration-500"
+              style={{
+                position: "relative",
+                top: itemOffsets[item] || 0,
+                transition: itemOffsets[item] ? "top 0s" : "top 0.5s ease",
+              }}
+            >
+              {item}
+            </li>
+          ))}
+        </ol>
+        <button onClick={reorderItems} className="mt-4 rounded bg-green-500 p-2 text-white">
+          Reverse Items
+        </button>
+      </div>
+    </div>
+  );
+};
+
+export default AnimatedReorderList;
+```
+
+## In-Depth Explanation
+
+### How `useLayoutEffect` Ensures Proper Measurements
+
+In this solution, we use `useLayoutEffect` instead of `useEffect`. This is critical because `useLayoutEffect` runs synchronously after DOM mutations, ensuring that our measurements (e.g., element positions) are up-to-date before the next paint.
+
+By the time React triggers a re-render after updating the state, we can reliably capture the position of each list item and calculate the offset based on its previous position.
+
+### Using `requestAnimationFrame` to Optimize Animations
+
+`requestAnimationFrame` is essential for smooth animations because it defers updates until the browser is ready to repaint. This method ensures that the offset reset (which removes the immediate top changes) happens in sync with the next frame, preventing abrupt jumps.
+
+Here's how the animation flow works:
+
+1. **Calculate the initial offsets**: When the list changes, we calculate how much each item has moved by comparing its current and previous top positions.
+2. **Apply the offsets**: The top style is updated to shift the items visually based on the calculated offsets.
+3. **Reset the offsets**: Inside the requestAnimationFrame callback, we reset the top styles, which triggers the CSS transition to animate items smoothly back to their new positions.
+
+### Ref Management with `useRef`
+
+`useRef` is used to store references to the DOM nodes of each item and their previous top positions. Since refs persist between renders without causing re-renders, they are ideal for this purpose.
+
+- `itemRefs`: Stores the current DOM reference for each list item.
+- `itemTops`: Stores the previous top position of each item, allowing us to compute the necessary offset.
+  By tracking these values, we can effectively calculate the difference in positions before and after the state change, ensuring a smooth transition.
+
+## Conclusion
+
+Using requestAnimationFrame and useLayoutEffect together in React projects provides a powerful way to manage animations and smooth transitions for dynamically reordered elements. This approach minimizes jank and ensures a responsive UI that reacts smoothly to state changes, improving user experience in interactive applications.

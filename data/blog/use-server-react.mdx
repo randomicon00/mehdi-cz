@@ -1,0 +1,171 @@
+---
+title: "Understanding 'use server' in React"
+date: "2025-02-21"
+tags: ["react", "server actions", "use server", "react server components"]
+draft: false
+summary: "A simple guide explaining the purpose and usage of the 'use server' directive in React Server Components, designed to enhance server-side functions in modern web applications."
+---
+
+## Understanding 'use server' in React
+
+The `'use server'` directive is a key feature introduced in React Server Components. It's primarily used to mark functions as Server Actions, which are server-side functions that can be invoked from the client side, making server-side interaction more seamless in React applications.
+
+## What is 'use server'?
+
+Simply put, `'use server'` is a directive you place at the top of an **async function** to let React know that this function should run on the server but be callable from the client. This is especially useful when you need to perform server-side operations (like database mutations) triggered by user actions from a client interface.
+
+```js
+async function addToCart(data) {
+  "use server";
+  // Add item to cart on the server
+}
+```
+
+In this example, when `addToCart` is called from the client, a network request is made to the server, where the function runs and performs the necessary server-side logic.
+
+## How Does It Work?
+
+When a client-side component calls a Server Action, it sends a network request to the server, along with any serialized arguments. Once the server processes the action, the server returns a serialized response back to the client. React takes care of the network request and response under the hood.
+
+## Usage with Forms
+
+Server Actions are especially handy in form submissions. You can pass a Server Action as the `action` prop of a `<form>`, allowing you to submit the form before the JavaScript bundle is loaded—this is called progressive enhancement.
+
+```jsx
+// App.js
+async function requestUsername(formData) {
+  "use server";
+  const username = formData.get("username");
+  // Process username on the server
+}
+
+export default function App() {
+  return (
+    <form action={requestUsername}>
+      <input type="text" name="username" />
+      <button type="submit">Request Username</button>
+    </form>
+  );
+}
+```
+
+In this scenario, when the form is submitted, React will automatically serialize the form data, send it to the server, and process it via `requestUsername`.
+
+## Security Considerations
+
+One important note: **Arguments to Server Actions are controlled by the client**. This means they must always be treated as untrusted input. Always validate and sanitize arguments to avoid security vulnerabilities, such as unauthorized data access or modifications.
+
+## Calling Server Actions Outside Forms
+
+You don't have to use forms to call Server Actions. They can also be called directly within a React component, often using Transitions for better handling of asynchronous state and user experience.
+
+```jsx
+import { useState, useTransition } from "react";
+import submitOrder from "./actions";
+
+function OrderButton() {
+  const [orderStatus, setOrderStatus] = useState("Pending");
+  const [isPending, startTransition] = useTransition();
+
+  const handleSubmitOrder = () => {
+    startTransition(async () => {
+      const result = await submitOrder();
+      setOrderStatus(result);
+    });
+  };
+
+  return (
+    <>
+      <p>Order Status: {orderStatus}</p>
+      <button onClick={handleSubmitOrder} disabled={isPending}>
+        Submit Order
+      </button>
+    </>
+  );
+}
+
+// actions.js
+("use server");
+
+export default async function submitOrder() {
+  // Server-side logic to submit an order
+  const success = true; // Imagine this result comes from a DB or external API
+
+  return success ? "Order Submitted!" : "Order Failed";
+}
+```
+
+### Explanation:
+
+- **Client-side**: The `OrderButton` component displays the order status and has a button to submit the order. When the button is clicked, it triggers a `startTransition`, which asynchronously calls the server action `submitOrder()` and updates the order status on the client.
+
+- **Server-side**: The `submitOrder()` function contains server-side logic to process an order (e.g., contacting a database or API). The result is then returned to the client, where the UI is updated to reflect the new order status.
+
+This example shows how you can use server actions for server-side processing, such as handling an order, while keeping the client-side code clean and simple.
+
+## Key Takeaways
+
+- `'use server'` marks a function as a **Server Action**, allowing it to be called from the client-side but executed server-side.
+- It enables **progressive enhancement** in forms, allowing for server-side processing before JavaScript fully loads.
+- **Security** is crucial—always validate and sanitize arguments passed to Server Actions as they are controlled by the client.
+- Server Actions work asynchronously and integrate seamlessly with React’s Transitions to manage loading states and optimistic updates.
+
+By leveraging Server Actions and the `'use server'` directive, React developers can create more seamless, server-driven web applications that remain fast and interactive, even with heavy server-side logic.
+
+## `useEffect` + `fetch` vs. `'use server'`
+
+### Location of Logic (Client vs Server):
+
+- `useEffect` + `fetch`: The logic for fetching data and processing it runs **entirely on the client**. The client sends a request to the server (using `fetch`), receives the data, and processes it in the client environment. This is useful for retrieving data like JSON from APIs or static resources.
+- **Server Actions** (`'use server'`): The logic for processing or updating data happens **on the server**. The client calls the server action, which runs server-side, performs the necessary operations (e.g., database updates, API calls), and then returns the result back to the client. The client-side component only receives the result, without having to handle the entire operation.
+
+### Security and Access Control:
+
+- `useEffect` + `fetch`: You expose the API endpoint directly to the client, which means the client can see the URL and potentially misuse it. You need to implement robust security on your API.
+- **Server Actions**: The logic stays on the server, which is inherently more secure. The client doesn't have direct access to the internal logic or data sources, only to the server function, which handles validation, authentication, etc., on the server.
+
+### Progressive Enhancement and Server-Side Processing:
+
+- `useEffect` + `fetch`: The client must wait for the full JavaScript bundle to load before `useEffect` can run and make the `fetch` request. This means any user interaction (e.g., form submission) may not work until the entire client-side code is ready.
+- **Server Actions**: With Server Actions, forms or buttons can trigger server-side logic **before the full JavaScript bundle is even loaded**. This allows for progressive enhancement, where the basic functionality (like submitting a form) works even without all the JavaScript on the page.
+
+### Complexity of Client-Side Code:
+
+- `useEffect` + `fetch`: You need to handle the full lifecycle of the request on the client, including error handling, request timing, caching, etc. This can add complexity to your React component.
+- **Server Actions**: The client code remains simpler because all the heavy lifting happens on the server. The client-side component only needs to deal with the result.
+
+### Data Mutations:
+
+- `useEffect` + `fetch`: This approach is often used for data fetching but isn't the best for data mutations (like updating a database), as you expose your mutation API to the client.
+- **Server Actions**: These are designed for data mutations (e.g., updating a database or sending data to an API), and they keep this logic on the server, which is generally more secure and efficient.
+
+### Example Comparison:
+
+- `useEffect` + `fetch`:
+
+```js
+useEffect(() => {
+  const fetchData = async () => {
+    try {
+      const response = await fetch("/api/data");
+      const result = await response.json();
+      setData(result);
+    } catch (error) {
+      console.error("Error fetching data", error);
+    }
+  };
+
+  fetchData();
+}, []);
+```
+
+- **Server Actions**:
+
+```js
+const handleClick = () => {
+  startTransition(async () => {
+    const updatedCount = await incrementLike(); // This function runs on the server
+    setLikeCount(updatedCount);
+  });
+};
+```

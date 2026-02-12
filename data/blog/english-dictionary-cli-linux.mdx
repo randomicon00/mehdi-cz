@@ -1,0 +1,39 @@
+---
+title: "How to Install a Command Line Dictionary for English"
+date: "2024-12-20"
+tags: ["command line", "dictionary", "linux", "2024"]
+draft: false
+summary: "Learn how to install a command line dictionary for English on your Linux system to quickly look up word definitions without leaving your terminal."
+---
+
+To quickly look up English word definitions from your terminal, you can use a command line dictionary like sdcv (StarDict Command Line Version). Here’s how to install it:
+
+## Installation
+
+**For Debian/Ubuntu**:
+
+```bash
+sudo apt install sdcv
+```
+
+**For Fedora**:
+
+```bash
+sudo dnf install sdcv
+```
+
+**For Arch Linux**:
+
+```bash
+sudo pacman -S sdcv
+```
+
+## Usage
+
+After installing, you can look up words like this:
+
+```bash
+sdcv [word]
+```
+
+To add dictionaries, you can download dictionary files (such as StarDict dictionaries) and place them in the `~/.stardict/dic/` directory.

@@ -1,0 +1,54 @@
+---
+title: "Today I Learned: Understanding Recursion in Computer Science"
+date: "2024-10-10"
+tags: ["Computer Science", "Algorithms", "Coding Tips"]
+draft: true
+summary: A fundamental concept in computer science, recursion is a powerful problem-solving technique that involves functions calling themselves. Let's break down how it works and where it's useful.
+---
+
+### Recursion in Computer Science: A Fundamental Concept
+
+Recursion is a technique in which a function calls itself to solve a problem. It is widely used in computer science for solving problems that can be broken down into smaller, similar subproblems.
+
+#### The Basic Idea
+
+A recursive function follows two essential rules:
+
+1. **Base Case:** A condition that stops the recursion.
+2. **Recursive Case:** The function calls itself with a modified argument that moves towards the base case.
+
+#### Example: Factorial Function
+
+The factorial of a number (n!) is defined as:
+
+```python
+def factorial(n):
+    if n == 0:
+        return 1  # Base case
+    return n * factorial(n - 1)  # Recursive case
+
+print(factorial(5))  # Output: 120
+```
+
+Here, the function keeps calling itself with decreasing values of `n` until it reaches 0, where it stops and starts returning values up the call stack.
+
+#### When to Use Recursion
+
+Recursion is particularly useful in:
+
+- **Tree and Graph Traversals:** Many data structures, like trees and graphs, benefit from recursive traversal algorithms.
+- **Divide and Conquer Algorithms:** Algorithms like Merge Sort and Quick Sort utilize recursion to break problems into smaller subproblems.
+- **Dynamic Programming:** Problems such as Fibonacci sequences can be solved using recursion with memoization to optimize performance.
+
+#### Recursion vs Iteration
+
+While recursion provides a cleaner and more intuitive approach to some problems, it can lead to performance issues due to increased memory usage (stack frames). In cases where recursion depth is too high, iteration might be a better choice to avoid stack overflow errors.
+
+#### Key Takeaways
+
+- Recursion simplifies solving problems that involve repetitive substructures.
+- Always define a **base case** to prevent infinite recursion.
+- Consider **tail recursion** or **memoization** for optimization in performance-heavy scenarios.
+- Be aware of stack limitations and use iteration when necessary.
+
+Recursion remains one of the most powerful tools in a programmer's toolkit, and understanding it well can unlock elegant solutions to many complex problems!

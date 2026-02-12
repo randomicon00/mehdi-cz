@@ -1,0 +1,147 @@
+---
+title: "Today I Learnt: stdout vs stderr in Bash — practical guide + 10 quick bash tips"
+date: "2025-09-16"
+tags: ["bash", "shell", "scripting", "til"]
+draft: false
+summary: "How stdout and stderr work in Bash, common redirection patterns, pitfalls, and 10 compact tips every beginner should know."
+---
+
+Bash programs write two common output streams: stdout (file descriptor 1) for normal output, and stderr (file descriptor 2) for errors and diagnostics.
+Knowing how to redirect and combine them is essential for reliable scripts and clean logs.
+
+### Basics: file descriptors
+
+- stdout = FD 1
+- stderr = FD 2
+
+Common redirections:
+
+- Redirect stdout: command > out.txt
+- Redirect stderr: command 2> err.txt
+- Redirect both (POSIX): command > all.txt 2>&1
+- Redirect both (bash extension): command &> all.txt
+
+Order matters: `command > out.txt 2>&1` sends stdout to out.txt then makes stderr follow stdout into out.txt. If you reverse them (`command 2>&1 > out.txt`) you end up redirecting stderr to the original stdout (usually the terminal) — not what you want.
+
+### Pipes and stderr
+
+Pipes only pass stdout by default. Example:
+
+- `cmd1 | cmd2` pipes cmd1's stdout to cmd2's stdin; cmd1's stderr still goes to the terminal.
+
+To pipe both stdout and stderr: `cmd1 2>&1 | cmd2` (or `cmd1 &> >(cmd2)` with process substitution).
+
+If you want to keep stderr separate while piping stdout, use process substitution:
+
+```
+cmd 2> >(grep -i error > errors.log) | grep success > successes.log
+```
+
+Here, stderr is redirected into the process substitution while stdout is piped normally.
+
+### Tee and logging
+
+To write output to both a file and the next pipe or terminal use `tee`:
+
+- `cmd | tee out.txt` (captures stdout)
+- `cmd 2>&1 | tee combined.txt` (captures both)
+
+To capture only stderr with tee (bash process substitution):
+
+```
+cmd 2> >(tee err.txt >&2)
+```
+
+### Exit codes and pipe failures
+
+- Every command has an exit code in `$?` (0 is success).
+- In a pipeline, use `${PIPESTATUS[@]}` to inspect each command's exit code (bash), or enable `set -o pipefail` to make the pipeline return a non-zero if any stage fails.
+
+Example useful header for robust scripts:
+
+```
+#!/usr/bin/env bash
+set -euo pipefail
+IFS=$'\n\t'
+```
+
+### Script-wide redirection
+
+To redirect all future stdout/stderr in a script to a logfile:
+
+```
+exec > script.log 2>&1
+```
+
+This is handy for daemonized scripts or single-file logging.
+
+### Writing to stderr from a script
+
+Use `>&2` when you want a message to go to stderr (so it won't mix with normal output):
+
+```
+echo "ERROR: missing config" >&2
+```
+
+### Quick summary
+
+- FD 1 = stdout, FD 2 = stderr.
+- Use `2>&1` (POSIX) or `&>` (bash) to combine.
+- Remember order when mixing redirections.
+- Use `set -o pipefail` for pipeline safety.
+
+---
+
+## 10 mini bash tips for learners
+
+1. Shebang and executable bit
+
+   - Put `#!/usr/bin/env bash` at the top of scripts and make them executable:
+
+   ```bash
+   chmod +x ./script.sh
+   ./script.sh
+   ```
+
+2. `set -euo pipefail` and `IFS`
+
+   - Use for safer scripts. `-e` exits on error, `-u` fails on unset variables, `-o pipefail` catches pipeline errors. Set a safe IFS for line handling.
+
+3. Quoting to avoid word-splitting
+
+   - Always quote expansions unless you intentionally want splitting: `"$var"` not `$var`.
+
+4. Read lines safely
+
+   - Use `while IFS= read -r line; do ...; done < file` to handle spaces and backslashes correctly.
+
+5. Default values and parameter expansion
+
+   - `${var:-default}` returns default if var unset/empty; `${var:=default}` assigns.
+
+6. Arrays and looping
+
+   - Bash arrays: `arr=(a b c)`; loop safely: `for x in "${arr[@]}"; do ...; done`.
+
+7. Command substitution
+
+   - Prefer `$(cmd)` over backticks for nesting and readability: `result=$(grep foo file)`.
+
+8. Use `[[` for tests in bash
+
+   - `[[` is safer and supports pattern matching: `if [[ "$x" == pattern* ]]; then ...; fi`.
+
+9. Here-documents for multiline input
+
+   - Useful for embedding text or feeding commands:
+
+   ```bash
+   cat <<'EOF' > config.ini
+   [section]
+   key=value
+   EOF
+   ```
+
+10. Cleanup with trap
+
+- Use `trap 'cleanup_function' EXIT` to ensure temporary files are removed even on errors.

@@ -1,0 +1,63 @@
+---
+title: "Leetcode Problem 3: Longest Substring Without Repeating Characters"
+date: "2025-01-02"
+tags: ["leetcode", "sliding window", "hashmap", "string manipulation"]
+draft: false
+summary: Learn how to solve the Longest Substring Without Repeating Characters problem using the sliding window technique.
+---
+
+### Problem Statement
+
+Given a string `s`, find the length of the longest substring without repeating characters.
+
+### Example:
+
+```python
+Input: "abcabcbb"
+Output: 3  # The longest substring is "abc"
+```
+
+### Solution Approach
+
+This problem can be efficiently solved using the **Sliding Window** technique with a **HashMap**.
+
+#### **Algorithm Explanation:**
+
+1. Use a **HashMap** (or HashSet) to store the characters of the current window.
+2. Maintain two pointers, `left` and `right`, which define the window.
+3. Expand `right` while ensuring unique characters in the window.
+4. If a duplicate character is found, shrink the window from `left` until the duplicate is removed.
+5. Keep track of the maximum window size encountered.
+
+### **Implementation**
+
+```python
+def length_of_longest_substring(s: str) -> int:
+    char_index = {}
+    left = 0
+    max_length = 0
+
+    for right in range(len(s)):
+        if s[right] in char_index:
+            left = max(char_index[s[right]] + 1, left)  # Move left pointer
+
+        char_index[s[right]] = right  # Update last seen index
+        max_length = max(max_length, right - left + 1)
+
+    return max_length
+```
+
+### **Complexity Analysis**
+
+- **Time Complexity:** `O(n)`, since each character is processed once.
+- **Space Complexity:** `O(min(n, 26))`, since at most 26 characters are stored in the map.
+
+### **Edge Cases**
+
+- Empty string: `s = ""` → Output: `0`
+- All unique characters: `s = "abcdef"` → Output: `6`
+- All same characters: `s = "aaaa"` → Output: `1`
+
+### **Conclusion**
+
+The sliding window approach optimally solves the problem in linear time, ensuring efficiency even for large strings.

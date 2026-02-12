@@ -1,0 +1,99 @@
+---
+title: "Using htmx 1.9.0 for Simplified Event Triggers on Select Elements"
+date: "2024-10-28"
+tags: ["htmx", "JavaScript", "frontend", "web development", "HTMX 1.9.0", "HTML"]
+draft: false
+summary: "Learn how to trigger network requests based on select options in htmx 1.9.0, streamlining your code by eliminating extra JavaScript."
+---
+
+In htmx 1.9.0, handling events like a `<select>` dropdown change event became easier. Previously, integrating complex event logic required additional JavaScript or Alpine.js, especially when triggering network requests based on specific user actions.
+
+Imagine a scenario where a user selects a specific option in a `<select>` dropdown, and you want this action to trigger a GET request. Before, you might have needed a setup like this:
+
+```html
+<select
+  x-on:change={`
+    if (event.target.value === 'myoption') {
+      document.querySelector('body').dispatchEvent(new Event('myevent'))
+    }
+  `}
+>
+  <option>...</option>
+  <option value="myoption" hx-get="/some-url" hx-trigger="myevent from:body" hx-target="#target">
+    Select this option
+  </option>
+</select>
+```
+
+In the new version of htmx, `hx-trigger` has been enhanced to directly handle inline event listeners. This allows you to eliminate Alpine.js or additional JavaScript:
+
+```html
+<select hx-trigger="change from:body" hx-get="/some-url" hx-target="#target">
+  <option>...</option>
+  <option value="myoption">Select this option</option>
+</select>
+```
+
+The `hx-trigger` attribute now directly listens to the `change` event, leveraging htmx’s internal handling. This will work if select is the only element triggering a `change` event in the current page.
+
+In htmx, the `from:` syntax (like `from:body` above) is used to specify which element in the DOM should emit the event that triggers the request. It provides flexibility by allowing events to be triggered from elements other than the one with the `hx-trigger` attribute. Here’s a closer look at how `from:` works and some examples to clarify its usage.
+
+#### Example 1: Using `from:body` to Trigger from the `<body>`
+
+Let's say you want to trigger a network request when an event on the `<body>` element fires, but the `hx-get` is attached to a different element. The `from:body` part specifies that the event should be dispatched from the `<body>` and not the element with `hx-get`.
+
+```html
+<body>
+  <select hx-get="/some-url" hx-trigger="change from:body" hx-target="#target">
+    <option value="option1">Option 1</option>
+    <option value="option2">Option 2</option>
+  </select>
+</body>
+```
+
+In this example, when a change event occurs on the `<body>`, it triggers the `hx-get` request on the `<select>` element.
+
+#### Example 2: Triggering from Another Element ID
+
+You can also use `from:` with any specific element ID. If, for instance, you want the `hx-trigger` to activate when an event on an element with ID `#other-element` fires, you could specify `from:#other-element`.
+
+```html
+<div id="other-element">Click me to trigger!</div>
+<button hx-get="/another-url" hx-trigger="click from:#other-element" hx-target="#result">
+  Trigger on Button
+</button>
+<div id="result"><!--Result will be appended here.--></div>
+```
+
+In this example, clicking the `<div id="other-element">` will trigger the `hx-get` request on the button element.
+
+#### Example 3: Using from:window for Global Events
+
+You can use `from:window` to capture events that are dispatched on the global window object, which is useful for capturing broader events like scrolling or resizing.
+
+```html
+<div hx-get="/fetch-data" hx-trigger="scroll from:window" hx-target="#content">
+  Content loads when you scroll
+</div>
+<div id="content"></div>
+```
+
+In this setup, the `hx-get` request fires whenever the scroll event is detected on the window, loading data into `#content`.
+
+#### Example 4: Combining Event Types with from:
+
+If you need a specific event type only from a certain source, you can combine multiple triggers by specifying more than one `hx-trigger`:
+
+```html
+<button
+  hx-get="/another-url"
+  hx-trigger="click from:body, mouseenter from:#hover-area"
+  hx-target="#result"
+>
+  Multi-source trigger
+</button>
+<div id="hover-area">Hover here to trigger request</div>
+<div id="result"></div>
+```
+
+Here, the `hx-get` will fire either when the `click` event happens on `body` or when `mouseenter` happens on `#hover-area`.

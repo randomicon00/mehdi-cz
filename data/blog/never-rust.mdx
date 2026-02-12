@@ -1,0 +1,49 @@
+---
+title: "Rust's `!` Type: The Never Type Equivalent"
+date: "2025-01-13"
+tags: ["rust", "never", "types", "error handling", "control flow"]
+draft: false
+summary: Rust's `!` type is equivalent to TypeScript's `never`, used to represent functions or expressions that never return a value.
+---
+
+In Rust, the equivalent of the `never` type in TypeScript is the `!` type (pronounced "never type"). It represents values that never occur and is used in functions or expressions that do not return.
+
+## Key Uses of `!` in Rust:
+
+1. **Functions That Never Return**: Functions that either run indefinitely (e.g., infinite loops) or always panic/abort can have the return type `!`. This tells the Rust compiler that the function will never successfully return a value.
+
+#### Example 1: Infinite Loop
+
+```rust
+fn infinite_loop() -> ! {
+    loop {
+        // This loop will never end, so the return type is `!`
+    }
+}
+```
+
+#### Example 2: Panicking Functions
+
+```rust
+fn panic_example() -> ! {
+    panic!("This function will never return.");
+}
+```
+
+#### Example 3: Match Exhaustiveness
+
+The `!` type can also be used in patterns where some branches are unreachable. For instance, when matching on an enum where some variants are impossible, the compiler can infer `!` for those branches.
+
+```rust
+fn match_exhaustiveness(value: Result<i32, &str>) {
+    match value {
+        Ok(num) => println!("Number: {}", num),
+        Err(err) => println!("Error: {}", err),
+        _ => unreachable!(), // This branch returns `!`
+    }
+}
+```
+
+### Summary:
+
+The `!` type in Rust is used to indicate that a function or expression `never` returns. It is typically used in functions that panic, run infinitely, or mark unreachable code paths. Just like TypeScript's `never`, Rust's `!` type helps the compiler and the programmer understand that certain code paths will never produce a value.

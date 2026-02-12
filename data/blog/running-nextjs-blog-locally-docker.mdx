@@ -1,0 +1,394 @@
+---
+title: "Running This Next.js Blog Locally and With Docker"
+date: "2025-12-27"
+tags: ["nextjs", "docker", "deployment", "development"]
+draft: false
+summary: "Quick guide to running this blog locally for development or testing in Docker. All the commands you need in one place."
+---
+
+# Running This Next.js Blog Locally and With Docker
+
+If you're working on this blog (or forked it), here's everything you need to run it locally or test it in Docker. No fluff, just the commands that work.
+
+## Prerequisites
+
+You'll need:
+
+- **Node.js 20+** (check with `node --version`)
+- **Yarn** (this project uses Yarn, not npm)
+- **Docker** (optional, only if you want to test containerization)
+
+## Local Development (Fast & Easy)
+
+### First Time Setup
+
+```bash
+# Clone the repo (if you haven't)
+git clone <your-repo-url>
+cd <repo-name>
+
+# Install dependencies
+yarn install
+
+# Create your environment file
+cp .env.example .env
+# Edit .env with your API keys (Buttondown, Formspree, etc.)
+```
+
+### Run Development Server
+
+```bash
+# Start dev server with hot reload
+yarn dev
+
+# Open http://localhost:3000
+# Edit files and see changes instantly
+```
+
+### Build for Production
+
+```bash
+# Build the static site
+yarn build
+
+# Test the production build locally
+yarn serve
+
+# Open http://localhost:3000
+```
+
+**That's it.** For most development, `yarn dev` is all you need.
+
+---
+
+## Docker Deployment (Production-Like Testing)
+
+### Why Use Docker?
+
+- Test your blog exactly as it'll run in production
+- Ensure environment variables load correctly
+- Share consistent environments across machines
+- Deploy anywhere that supports Docker
+
+### The BuildKit Issue
+
+**Important:** This project has a Docker networking quirk on some Linux systems. Always build with `DOCKER_BUILDKIT=0`:
+
+```bash
+# This will fail on some systems
+docker build -t mehdi-blog .
+
+# This works
+DOCKER_BUILDKIT=0 docker build -t mehdi-blog .
+```
+
+Or set it permanently:
+
+```bash
+export DOCKER_BUILDKIT=0
+# Add to ~/.bashrc or ~/.zshrc to make permanent
+```
+
+### Build the Docker Image
+
+```bash
+# Build from Dockerfile
+DOCKER_BUILDKIT=0 docker build -t mehdi-blog .
+
+# Takes ~40 seconds
+# Generates 722 static pages
+# Final image is ~500MB (Alpine-based)
+```
+
+### Run the Container
+
+```bash
+# Run detached (in background)
+docker run -d \
+  --name mehdi-blog \
+  -p 3000:3000 \
+  --env-file .env \
+  mehdi-blog
+
+# Container starts in ~250ms
+# Blog available at http://localhost:3000
+```
+
+### Check Container Status
+
+```bash
+# See running containers
+docker ps
+
+# View logs
+docker logs mehdi-blog
+
+# Follow logs in real-time
+docker logs -f mehdi-blog
+
+# Check resource usage
+docker stats mehdi-blog
+```
+
+### Stop and Remove Container
+
+```bash
+# Stop gracefully
+docker stop mehdi-blog
+
+# Remove container
+docker rm mehdi-blog
+
+# Or do both at once
+docker stop mehdi-blog && docker rm mehdi-blog
+
+# Force kill (if it won't stop)
+docker rm -f mehdi-blog
+```
+
+### Rebuild After Changes
+
+```bash
+# Stop old container
+docker stop mehdi-blog && docker rm mehdi-blog
+
+# Rebuild image
+DOCKER_BUILDKIT=0 docker build -t mehdi-blog .
+
+# Run new container
+docker run -d --name mehdi-blog -p 3000:3000 --env-file .env mehdi-blog
+```
+
+**One-liner version:**
+
+```bash
+docker rm -f mehdi-blog && \
+DOCKER_BUILDKIT=0 docker build -t mehdi-blog . && \
+docker run -d --name mehdi-blog -p 3000:3000 --env-file .env mehdi-blog
+```
+
+---
+
+## Docker Compose (Recommended for Regular Use)
+
+Easier than remembering all those flags.
+
+### Start Everything
+
+```bash
+# Build and start
+DOCKER_BUILDKIT=0 docker-compose up -d --build
+
+# View logs
+docker-compose logs -f
+
+# Just start (without rebuilding)
+docker-compose up -d
+```
+
+### Stop Everything
+
+```bash
+# Stop containers
+docker-compose down
+
+# Stop and remove volumes (clean slate)
+docker-compose down -v
+```
+
+### Restart After Changes
+
+```bash
+# Rebuild and restart
+docker-compose down
+DOCKER_BUILDKIT=0 docker-compose up -d --build
+```
+
+---
+
+## Useful Docker Commands
+
+### Clean Up
+
+```bash
+# Remove stopped containers
+docker container prune
+
+# Remove unused images
+docker image prune
+
+# Remove everything unused (careful!)
+docker system prune -a
+
+# See all images
+docker images
+
+# Delete specific image
+docker rmi mehdi-blog
+```
+
+### Inspect Container
+
+```bash
+# Get container details
+docker inspect mehdi-blog
+
+# Check environment variables
+docker exec mehdi-blog env | grep BUTTONDOWN
+
+# Open shell inside container
+docker exec -it mehdi-blog sh
+
+# Check if container is healthy
+docker inspect mehdi-blog | grep Health
+```
+
+### Push to Docker Hub (Optional)
+
+```bash
+# Tag for Docker Hub
+docker tag mehdi-blog yourusername/mehdi-blog:latest
+
+# Login
+docker login
+
+# Push
+docker push yourusername/mehdi-blog:latest
+
+# Pull on another machine
+docker pull yourusername/mehdi-blog:latest
+docker run -d -p 3000:3000 --env-file .env yourusername/mehdi-blog:latest
+```
+
+---
+
+## Environment Variables
+
+The blog needs these environment variables (stored in `.env`):
+
+**Required:**
+
+- `BUTTONDOWN_API_KEY` - Newsletter subscriptions
+- `NEXT_PUBLIC_FORMSPREE_KEY` - Contact form
+
+**Optional:**
+
+- `NEXT_UMAMI_ID` - Analytics
+- `NEXT_PUBLIC_GISCUS_*` - Comments
+
+**Never commit `.env` to git.** It's in `.gitignore` for a reason.
+
+Use `.env.example` as a template:
+
+```bash
+cp .env.example .env
+# Edit with your real keys
+```
+
+---
+
+## Troubleshooting
+
+### Port Already in Use
+
+```bash
+# Find what's using port 3000
+lsof -i :3000
+
+# Kill it
+kill -9 <PID>
+
+# Or use a different port
+docker run -d -p 3001:3000 --name mehdi-blog --env-file .env mehdi-blog
+```
+
+### Build Fails
+
+```bash
+# Clear Next.js cache
+rm -rf .next
+
+# Clear node_modules
+rm -rf node_modules
+yarn install
+
+# Rebuild
+yarn build
+```
+
+### Docker Container Won't Start
+
+```bash
+# Check logs for errors
+docker logs mehdi-blog
+
+# Verify .env file exists
+ls -la .env
+
+# Check if environment variables loaded
+docker exec mehdi-blog env
+```
+
+### Changes Not Showing
+
+```bash
+# For local dev (yarn dev picks up changes automatically)
+# Just refresh the browser
+
+# For Docker, you need to rebuild
+docker stop mehdi-blog && docker rm mehdi-blog
+DOCKER_BUILDKIT=0 docker build -t mehdi-blog .
+docker run -d --name mehdi-blog -p 3000:3000 --env-file .env mehdi-blog
+```
+
+---
+
+## Quick Reference
+
+**Development:**
+
+```bash
+yarn dev          # Start dev server
+yarn build        # Build for production
+yarn serve        # Test production build
+```
+
+**Docker (single container):**
+
+```bash
+DOCKER_BUILDKIT=0 docker build -t mehdi-blog .
+docker run -d --name mehdi-blog -p 3000:3000 --env-file .env mehdi-blog
+docker logs -f mehdi-blog
+docker stop mehdi-blog && docker rm mehdi-blog
+```
+
+**Docker Compose:**
+
+```bash
+DOCKER_BUILDKIT=0 docker-compose up -d --build
+docker-compose logs -f
+docker-compose down
+```
+
+**Cleanup:**
+
+```bash
+docker rm -f mehdi-blog
+docker system prune
+```
+
+---
+
+## What's Next?
+
+Once you're happy with local testing:
+
+1. Commit your changes: `git add . && git commit -m "Update blog"`
+2. Push to GitHub: `git push`
+3. Deploy to Vercel (easiest) or your own VPS with Docker
+
+See [DEPLOYMENT.md](https://github.com/randomicon00/mediaknet/blob/main/DEPLOYMENT.md) for full deployment options.
+
+---
+
+That's all you need. Keep this page bookmarked if you ever forget the Docker commands. We've all been there.

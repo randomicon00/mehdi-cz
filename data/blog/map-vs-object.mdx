@@ -1,0 +1,150 @@
+---
+title: "Map vs Object in JavaScript"
+date: "2025-01-08"
+tags: ["javascript", "map", "object", "key-value", "ecmascript-6"]
+draft: false
+summary: "A detailed comparison between Map and Object in JavaScript, their key differences, and use cases to help developers choose the right data structure."
+---
+
+In JavaScript, both `Map` and `Object` serve as key-value data structures, but they cater to different use cases and have distinct features. This article explores their differences and provides guidance on when to use each.
+
+### Key Differences Between Map and Object
+
+| Feature                 | Map                                                       | Object                                                            |
+| ----------------------- | --------------------------------------------------------- | ----------------------------------------------------------------- |
+| **Key Types**           | Any data type, including objects                          | Limited to strings and symbols                                    |
+| **Iteration**           | Supports easy iteration (`for...of`, `forEach`)           | Requires helper methods (`Object.keys()`, `for...in`)             |
+| **Size**                | Has a `size` property                                     | No direct size property; use `Object.keys(obj).length`            |
+| **Performance**         | Efficient for frequent additions/removals                 | Efficient for frequent reads with string keys                     |
+| **Key Order**           | Maintains insertion order                                 | No guaranteed order (though ES6+ preserves order for string keys) |
+| **Methods**             | Provides built-in methods (`set`, `get`, `has`, `delete`) | Limited built-in methods                                          |
+| **Prototype Pollution** | Does not inherit from a prototype                         | Keys can conflict with inherited properties                       |
+| **Serialization**       | Not JSON-compatible without conversion                    | Directly compatible with JSON                                     |
+
+### Key Features of Map
+
+- **Versatile Keys:** Map allows any data type as keys, including objects, functions, and arrays. For example:
+
+  ```javascript
+  const map = new Map();
+  const objKey = {};
+  map.set(objKey, "value");
+  console.log(map.get(objKey)); // Output: "value"
+  ```
+
+- **Maintains Key Order:** Map preserves the insertion order of keys, making it reliable for scenarios where order matters.
+
+- **Iteration-Friendly:** Built-in iteration methods like `forEach` and `for...of` make working with Maps straightforward:
+
+  ```javascript
+  for (const [key, value] of map) {
+    console.log(`${key}: ${value}`);
+  }
+  ```
+
+- **Built-in Methods:** Functions like `set`, `get`, `delete`, and `has` simplify operations:
+  ```javascript
+  map.set("name", "Alice");
+  console.log(map.has("name")); // true
+  map.delete("name");
+  ```
+
+### Key Features of Object
+
+- **JSON Compatibility:** Objects can be directly serialized to and from JSON without any conversion.
+
+- **Readable Syntax:** Objects have a simple literal syntax for initialization and access:
+
+  ```javascript
+  const obj = { name: "Alice", age: 30 };
+  console.log(obj.name); // "Alice"
+  ```
+
+- **Prototype Methods:** Objects inherit methods from their prototype, like `toString` and `hasOwnProperty`. This can lead to conflicts:
+  ```javascript
+  const obj = { toString: "Custom Value" };
+  console.log(obj.toString); // "Custom Value"
+  delete obj.toString;
+  console.log(obj.toString()); // "[object Object]"
+  ```
+
+### Use Cases for Map
+
+- **Dynamic Key Types:** When keys are not strictly strings or symbols (e.g., numbers, objects).
+- **Preserving Key Order:** When insertion order of keys is important.
+- **Frequent Additions and Deletions:** Map is optimized for dynamic updates.
+
+### Use Cases for Object
+
+- **Static Key-Value Pairs:** When keys are predetermined and string-based.
+- **JSON Interoperability:** When working with APIs or data exchange formats requiring JSON.
+- **Read-Heavy Workloads:** Objects often have better performance for frequent reads with string keys.
+
+### Examples
+
+#### Storing Employee Data
+
+**Using Map:**
+
+```javascript
+const employeeMap = new Map();
+employeeMap.set("John", { age: 30, department: "IT" });
+employeeMap.set("Alice", { age: 35, department: "HR" });
+console.log(employeeMap.get("John"));
+```
+
+**Using Object:**
+
+```javascript
+const employeeObj = {
+  John: { age: 30, department: "IT" },
+  Alice: { age: 35, department: "HR" },
+};
+console.log(employeeObj["John"]);
+```
+
+#### Iterating Over User Preferences
+
+**Using Map:**
+
+```javascript
+const preferences = new Map();
+preferences.set("theme", "dark");
+preferences.set("language", "English");
+for (const [key, value] of preferences) {
+  console.log(`${key}: ${value}`);
+}
+```
+
+**Using Object:**
+
+```javascript
+const preferences = {
+  theme: "dark",
+  language: "English",
+};
+Object.entries(preferences).forEach(([key, value]) => {
+  console.log(`${key}: ${value}`);
+});
+```
+
+### FAQs
+
+#### How does performance differ between Map and Object?
+
+- Map excels in scenarios with frequent updates or varied key types.
+- Object is faster for read-heavy operations with string keys.
+
+#### Can Map keys be non-string values?
+
+Yes, Map keys can be of any type, unlike Object keys, which are always strings or symbols.
+
+#### Do Map and Object preserve insertion order?
+
+- Map preserves key insertion order.
+- Object maintains order for string keys (post-ES6) but does not guarantee it for non-string keys.
+
+#### How to get the size of a Map or Object?
+
+- Map has a `size` property.
+- Use `Object.keys(obj).length` to determine the size of an Object.

@@ -1,0 +1,163 @@
+---
+title: "Understanding the satisfies Operator in TypeScript"
+date: "2025-02-05"
+tags: ["typescript", "type safety", "satisfies operator"]
+draft: false
+summary: Learn how the satisfies operator in TypeScript ensures type conformity while preserving literal type information, making your code safer and more expressive.
+---
+
+The `satisfies` operator in TypeScript is a relatively new addition that combines the power of type checking with preserving the literal type information of an object. This feature is particularly useful in scenarios where you need to ensure that an object conforms to a specific type while retaining additional property type information for later use. In this article, we’ll explore how the `satisfies` operator works, its benefits, and how it compares to other approaches like `as` or explicit typing.
+
+## Basics of the `satisfies` Operator
+
+Let’s start with a simple example:
+
+```typescript
+type Config = {
+  theme: "dark" | "light";
+};
+
+const appConfig = {
+  theme: "dark",
+  debug: true,
+} satisfies Config;
+```
+
+This code will throw an error:
+
+```
+Object literal may only specify known properties, and 'debug' does not exist in type 'Config'.
+```
+
+### Why Does This Happen?
+
+The `satisfies` operator enforces strict compatibility with the provided type (`Config`), ensuring that:
+
+1. The object has exactly the properties defined in the type.
+2. No extra properties are added unless explicitly accounted for.
+
+In this example, `debug` is not a property of `Config`, so TypeScript raises an error.
+
+---
+
+## Fixing the Issue
+
+To include additional properties like `debug` while ensuring the object still satisfies the `Config` type, you can use one of the following approaches:
+
+### 1. Type Intersection
+
+Extend the `Config` type using a union with a more flexible type:
+
+```typescript
+type Config = {
+  theme: "dark" | "light";
+};
+
+const appConfig = {
+  theme: "dark",
+  debug: true,
+} satisfies Config & Record<string, unknown>; // ✅ No error
+```
+
+Here, `Record<string, unknown>` allows additional properties without violating the `Config` structure.
+
+### 2. Separate the Validation
+
+Define the object first, then validate it separately using `satisfies`:
+
+```typescript
+type Config = {
+  theme: "dark" | "light";
+};
+
+const appConfig = {
+  theme: "dark",
+  debug: true,
+};
+
+const validatedConfig = appConfig satisfies Config; // ✅ No error
+```
+
+This approach retains extra properties in `appConfig` while ensuring `validatedConfig` conforms to `Config`.
+
+---
+
+## Key Benefits of `satisfies`
+
+1. **Preserves Literal Type Information**
+   Unlike explicit typing or type assertions, `satisfies` retains the literal type of object properties:
+
+   ```typescript
+   const favoriteColors = {
+     red: "yes",
+     green: false,
+     blue: "kinda",
+   } satisfies Record<"red" | "green" | "blue", unknown>;
+
+   favoriteColors.red.toUpperCase(); // ✅ OK (string)
+   favoriteColors.green.toUpperCase(); // ❌ Error (boolean)
+   ```
+
+   Without `satisfies`, TypeScript would generalize `favoriteColors.red` and `favoriteColors.green` to `unknown`, preventing useful operations like calling `toUpperCase()` on the string.
+
+2. **Type Safety Without Casting**
+   The `as` keyword bypasses type safety, potentially introducing runtime errors. The `satisfies` operator enforces type correctness without overriding the type system.
+
+   ```typescript
+   const config = {
+     theme: "dark",
+     debug: true,
+   } as Config; // ✅ No compile error, but risky
+
+   console.log(config.debug.toFixed(2)); // ❌ Runtime error: debug is not a number
+   ```
+
+3. **Useful for Frameworks**
+   Frameworks like Vue or React that use object literals extensively can benefit from `satisfies` to validate configurations while preserving type inference.
+
+---
+
+## Comparison: `satisfies` vs Explicit Typing
+
+Consider the following example:
+
+```typescript
+type Colors = "red" | "green" | "blue";
+
+const favoriteColors: Record<Colors, unknown> = {
+  red: "yes",
+  green: false,
+  blue: "kinda",
+};
+
+favoriteColors.red.toUpperCase(); // ❌ Error: Type is unknown
+```
+
+Here, explicit typing with `Record<Colors, unknown>` forces all values to be `unknown`, losing the specific type information of `red`, `green`, and `blue`.
+
+With `satisfies`:
+
+```typescript
+const favoriteColors = {
+  red: "yes",
+  green: false,
+  blue: "kinda",
+} satisfies Record<Colors, unknown>;
+
+favoriteColors.red.toUpperCase(); // ✅ OK
+favoriteColors.green.toUpperCase(); // ❌ Error: green is a boolean
+```
+
+The `satisfies` operator retains the literal type of each value while ensuring the object conforms to the `Record<Colors, unknown>` type.
+
+---
+
+## Summary
+
+The `satisfies` operator is a powerful tool that ensures an object conforms to a specific type while preserving the inferred types of its properties. It’s particularly useful in scenarios where:
+
+1. You need to validate objects with strict type requirements.
+2. You want to retain detailed type information for further operations.
+3. You aim to enhance type safety without resorting to type assertions.
+
+Use the `satisfies` operator to make your TypeScript code safer, more expressive, and easier to maintain!

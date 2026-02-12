@@ -1,0 +1,14 @@
+---
+title: "Export environment variables"
+date: "2025-09-16"
+tags: ["bash", "til"]
+draft: false
+summary: "export makes variables available to child processes; assign then export or do both on one line."
+---
+
+```bash
+export MY_VAR=value
+VAR2=value2; export VAR2
+```
+
+Note: `VAR=value cmd` exports only for that single command invocation.

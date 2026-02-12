@@ -1,0 +1,82 @@
+---
+title: "Exploring Linux's Pluggable Authentication Modules (PAM)"
+date: "2024-01-22"
+tags: ["linux", "manjaro", "faillock", "pam", "authentication", "modularity"]
+draft: false
+summary: Discover the intricacies of Linux’s authentication system through PAM modules on a Saturday morning journey, where a software engineer explores ways to modify frustrating login delays after failed attempts.
+---
+
+It's Saturday morning, and as usual, I’ve booted up my trusty Manjaro machine to explore more of the mysterious nooks and crannies of my Linux system. Today, I decided to delve into a part of the system I hadn't paid much attention to before: the root (`/`) directory.
+
+As a software engineer, Linux never ceases to amaze me. It’s a playground of modularity, flexibility, and power. I’m always fascinated by how all the moving parts of this operating system work together so seamlessly—often invisible to the user unless you deliberately go looking. And that’s exactly what I’m doing today.
+
+### Tackling a Frustrating Problem: The 10-Minute Wait
+
+Like many Linux users, I’ve occasionally mistyped my password a few times while trying to log in. But the next thing you know—bam—I’m locked out for a full 10 minutes after just three failed login attempts. While this is obviously a security feature designed to prevent brute force attacks, it can be frustrating when you're simply human and make a few typos in a row.
+
+So, I wondered: **can I change this behavior?** Could I reduce that painful waiting time to something more reasonable?
+
+This is where my exploration led me deeper into the bowels of the `/etc/` directory and, more specifically, to **PAM**—the **Pluggable Authentication Modules** system.
+
+### The Discovery: PAM and the `faillock` Module
+
+As I navigated through the `/etc/security/` directory, I stumbled upon a file named `faillock.conf`. And that’s where the gears in my head started turning. It became clear that PAM was the mechanism responsible for managing user authentication, including how many failed login attempts you can make before the system locks you out and for how long.
+
+PAM is a beautiful example of Linux's modularity. Instead of locking authentication logic inside a rigid, unchangeable binary, Linux exposes the entire system’s behavior through configuration files, like `faillock.conf`. This file controls the **`pam_faillock.so`** module, which manages failed login attempts.
+
+Here’s a snippet of what I found inside:
+
+```bash
+deny = 3
+unlock_time = 600
+```
+
+In plain English, this says:
+
+- After **3 failed login attempts**, the system will lock you out.
+- The lock lasts for **600 seconds** (or 10 minutes).
+
+### Modifying PAM: Empowerment through Configuration
+
+Now armed with the knowledge of how pam_faillock.so works, I decided to take control of this frustrating situation. I modified the config file to suit my needs:
+
+```bash
+deny = 10
+unlock_time = 30
+```
+
+I changed the number of allowed attempts to **10** (to account for my clumsy fingers) and reduced the lockout time to **30 seconds**. That’s the beauty of Linux—it gives you the power to tailor the system to your needs, all through simple configuration files.
+
+### Diving Deeper: The Power of Modularity in Linux
+
+The **modularity** of Linux is what makes it so flexible and powerful. Everything, from the kernel to the authentication system, is built with components that can be swapped out, reconfigured, or extended as needed. **PAM** is a perfect example of this modular design philosophy.
+
+Each PAM module (such as `pam_unix.so`, `pam_faillock.so`, or `pam_env.so`) is responsible for a specific aspect of the authentication process. These modules are assembled declaratively in configuration files (usually found in `/etc/pam.d/`), allowing you to customize how authentication is handled for each service—whether it's login via SSH, a console session, or even `sudo`.
+
+With just a few lines in the PAM configuration file, you can control everything:
+
+- How many login attempts are allowed.
+- Whether root can be locked out or exempted from lockout.
+- How long you’ll be locked out after failed attempts.
+
+Instead of writing complex logic, administrators piece together these modules in configuration files, a declarative approach that simplifies and centralizes control.
+
+### The Positive Aspects of Linux's Design
+
+This modularity is why Linux is so beloved by software engineers, system administrators, and enthusiasts. It lets you:
+
+- **Control everything**: If you don’t like how something works, you can change it. For instance, you can customize PAM to suit specific security requirements by adding or removing modules like `pam_faillock` to enforce login limits, or `pam_google_authenticator` to add multi-factor authentication (MFA). Similarly, system services such as SSH are fully configurable via files like `/etc/ssh/sshd_config`, allowing administrators to tweak everything from key-based authentication to port numbers.
+
+- **Separate concerns**: Each PAM module does one thing and does it well. For example, pam_unix.so handles basic user authentication via the `/etc/passwd` and `/etc/shadow` files, while `pam_limits.so` enforces resource limits defined in `/etc/security/limits.conf`. This separation of concerns ensures that each module focuses on a specific task, allowing for better maintainability. Another example outside of PAM would be the Linux networking stack, where iptables handles firewall rules, while NetworkManager deals with network interfaces—each tool with a specific, well-defined role.
+
+- **Maintain flexibility**: Want to enable multi-factor authentication? Simply plug in the `pam_google_authenticator` module for MFA with Google Authenticator. Want to allow more login attempts before lockout? Adjust the `pam_faillock` settings in a config file. There’s no need to recompile the system or touch source code—just edit the configuration files. Beyond PAM, this modular flexibility extends to the Linux kernel itself, where loadable kernel modules (LKMs) like `ext4.ko` for file systems or `nvidia.ko` for GPU drivers can be dynamically added or removed as needed, without rebooting or recompiling the entire kernel.
+
+This isn’t just limited to PAM; it’s a fundamental philosophy in Linux’s design. Whether you’re configuring a web server with Apache modules (like `mod_ssl` for HTTPS) or managing storage with LVM (Logical Volume Manager) to flexibly allocate disk space, Linux’s modular approach provides both power and flexibility. The ability to tailor everything from authentication to network routing to kernel drivers makes Linux an incredibly versatile operating system, capable of adapting to virtually any use case.
+
+### Final Thoughts
+
+So, as I wrap up my Saturday morning exploration of Manjaro, I find myself deeply appreciating how Linux’s underlying architecture gives users both power and control. Systems like PAM and its `faillock` module allow us to tweak even the most minute behaviors, such as login failures, with just a bit of configuration.
+
+This exploration isn’t just about getting rid of an annoying 10-minute lockout period—it’s about how `Linux's modularity` and `declarative design` enable us to easily adapt the system to our needs, offering both flexibility and security.
+
+Now that I’ve got my lockout time under control, I’m ready to dive into the next layer of the / directory. Who knows what I'll discover next?

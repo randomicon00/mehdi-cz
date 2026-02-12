@@ -1,0 +1,86 @@
+---
+title: "Setting Up Cursor IDE for AI-First Development"
+date: "2025-09-16"
+tags: ["ai", "cursor", "ide", "productivity"]
+draft: false
+summary: "Configure Cursor IDE to maximize AI assistance in your daily coding workflow."
+---
+
+Cursor IDE is built for AI-first development. Learn to leverage its unique features for faster, smarter coding.
+
+## Key Features Setup
+
+**Composer (Ctrl+I):** Multi-file AI editing
+
+```
+Enable in settings: AI > Composer > Auto-apply simple changes
+```
+
+**Chat (Ctrl+L):** Contextual code discussions
+
+```
+@workspace - Include entire codebase context
+@file - Reference specific files
+@code - Discuss selected code
+```
+
+**Tab Autocomplete:** Intelligent code completion
+
+```
+Settings > AI > Tab Autocomplete > Enable
+Model: GPT-4 (for better accuracy)
+```
+
+## Effective Workflows
+
+**Refactoring:**
+
+```
+1. Select code block
+2. Ctrl+I: "Extract this to a reusable hook"
+3. Review and apply changes
+```
+
+**Bug fixing:**
+
+```
+1. Ctrl+L with error context
+2. Ask: "This function throws [error]. Fix it and explain why"
+```
+
+**Code review:**
+
+```
+1. Select function/class
+2. Ctrl+L: "Review this code for performance and security issues"
+```
+
+## Pro Tips
+
+- Use Rules for Custom Instructions to maintain coding standards
+- Configure model preferences per project type
+- Leverage the command palette for quick AI actions
+
+## Why this matters
+
+- Good editor ergonomics make AI assistance feel native, not noisy.
+- You reduce context switching and keep momentum during tough tasks.
+- A tuned setup improves code quality without extra ceremony.
+
+## How to use this today
+
+- Start with minimal keybindings; add only what you use weekly.
+- Configure project-level context (docs, scripts, scripts) for better recall.
+- Enable inline explanations and diffs when reviewing changes.
+
+## Common pitfalls
+
+- Feature overload: disable what you don’t actively use.
+- Leaky context: avoid sending secrets or large proprietary blobs.
+- Drift: share a team settings file to standardize experience.
+
+## What to try next
+
+- Add commands that generate tests/docs with one keystroke.
+- Automate playgrounds for quick repros inside the editor.
+- Create a prompt palette tailored to your stack.

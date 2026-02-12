@@ -1,0 +1,396 @@
+---
+title: "How Deno’s Rust Functions Actually Work — Wrapping V8 via rusty_v8"
+date: "2025-09-19"
+tags: ["deno", "rust", "rusty_v8", "v8", "ops", "runtime", "webcrypto"]
+draft: false
+summary: "A practitioner’s deep dive into ops, resources, and the V8 bridge in Deno’s Rust core."
+---
+
+There’s a clean idea at the heart of Deno: **JavaScript and Web APIs on top of V8, with Rust doing the heavy lifting.** You write JS/TS; the runtime routes privileged work into Rust; `rusty_v8` exposes V8’s C++ API to Rust; and a thin macro layer (`#[op2]`) keeps the cross-language boundary boring and safe.
+
+If you understand three concepts—**ops**, **resources**, and **V8 handles/scopes**—you can read the Deno source and feel at home. This piece walks you through those concepts using real, representative snippets (crypto, console preview, and filesystem abstractions), then ties them back to where they plug into the Deno tree.
+
+---
+
+## 0) The mental model (one screen)
+
+```text
+JS/TS  ──(call)──►  opSync/opAsync  ──►  Rust fn (#[op2])
+             ▲                        │
+             │  serde_v8 marshaling   │
+             └───────────────◄────────┘  return value / Promise resolution
+
+Rust fn may:
+  • manipulate V8 directly (via rusty_v8 handles)
+  • do IO/CPU work, create/operate on Resources
+  • schedule async work on a pool / event loop
+
+V8 isolate & scopes are managed by deno_core; rusty_v8 is the FFI layer.
+```
+
+- **Ops:** Named, exported Rust functions callable from JS (`op_*`). They are declared with `#[op2]`. Sync ops return a value; async ops return a `Future` and map to Promises on the JS side.
+- **Resources:** Long-lived, OS-backed objects (files, sockets, subprocess pipes) kept in a `ResourceTable` and referenced by numeric `rid`s from JS.
+- **V8 handles & scopes:** When you want to touch actual V8 objects (not just serialize values), you receive a `v8::HandleScope` and operate with typed handles.
+
+Everything else is glue.
+
+---
+
+## 1) The `#[op2]` macro: the boring bridge you _want_
+
+Ops are declared in Rust with `#[op2]` and optionally `async`. The macro generates a trampoline that:
+
+1. Reads V8 arguments and converts them to Rust types (via `serde_v8` or special buffer converters).
+2. Calls your Rust function.
+3. Converts the result/error back into a V8 value (or a rejected Promise for `async`).
+
+### Example: WebCrypto encrypt
+
+A real Deno-style op:
+
+```rust
+use deno_core::{op2, JsBuffer, ToJsBuffer};
+use deno_core::unsync::spawn_blocking;
+
+#[op2(async)]
+#[serde]
+pub async fn op_crypto_encrypt(
+  #[serde] opts: EncryptOptions,
+  #[buffer] data: JsBuffer,
+) -> Result<ToJsBuffer, EncryptError> {
+  let key = opts.key;
+  let fun = move || match opts.algorithm {
+    EncryptAlgorithm::RsaOaep { hash, label } => {
+      encrypt_rsa_oaep(key, hash, label, &data)
+    }
+    EncryptAlgorithm::AesCbc { iv, length } => {
+      encrypt_aes_cbc(key, length, iv, &data)
+    }
+    EncryptAlgorithm::AesGcm {
+      iv, additional_data, length, tag_length,
+    } => encrypt_aes_gcm(key, length, tag_length, iv, additional_data, &data),
+    EncryptAlgorithm::AesCtr { counter, ctr_length, key_length } => {
+      encrypt_aes_ctr(key, key_length, &counter, ctr_length, &data)
+    }
+  };
+  let buf = spawn_blocking(fun).await.unwrap()?;
+  Ok(buf.into())
+}
+```
+
+Key takeaways:
+
+- `#[op2(async)]` tells Deno this returns a `Promise` in JS.
+- `#[serde]` on parameters enables automatic deserialization from JS objects into Rust structs/enums via `serde_v8`.
+- `#[buffer] data: JsBuffer` gives you a borrowed view into the JS ArrayBuffer/TypedArray payload (without eager copying). The return type `ToJsBuffer` moves bytes back to JS efficiently.
+- The op uses `deno_core::unsync::spawn_blocking` to offload CPU-heavy encryption so you **don’t block the V8 thread**. That’s crucial: a long sync call would freeze JS; `spawn_blocking` runs it on a worker and resumes the Promise when done.
+
+Why this matters: JS gets a clean `await crypto.encrypt(...)`, while the runtime does permissions checks, argument parsing, and CPU work safely on the Rust side.
+
+### Error mapping that feels native
+
+```rust
+#[derive(Debug, thiserror::Error, deno_error::JsError)]
+pub enum EncryptError {
+  #[class(inherit)]
+  #[error(transparent)]
+  General(#[from] #[inherit] SharedError),
+
+  #[class(type)]
+  #[error("invalid length")]
+  InvalidLength,
+
+  #[class("DOMExceptionOperationError")]
+  #[error("invalid key or iv")]
+  InvalidKeyOrIv,
+
+  // ...
+}
+```
+
+`deno_error::JsError` + the `#[class(...)]` annotations tell the bridge how to project Rust errors into **domain-specific JS errors** (often `DOMException`s with correct names). That’s how you get familiar WebCrypto exceptions instead of “Rust error XYZ”.
+
+### The serde angle that saves you code
+
+```rust
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EncryptOptions {
+  key: V8RawKeyData,
+  #[serde(flatten)]
+  algorithm: EncryptAlgorithm,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", tag = "algorithm")]
+pub enum EncryptAlgorithm {
+  #[serde(rename = "RSA-OAEP")] RsaOaep { /* … */ },
+  #[serde(rename = "AES-CBC")]  AesCbc  { /* … */ },
+  #[serde(rename = "AES-GCM")]  AesGcm  { /* … */ },
+  #[serde(rename = "AES-CTR")]  AesCtr  { /* … */ },
+}
+```
+
+JS can pass a single options object. The tagged enum picks the right variant. **You don’t write manual argument decoders; the macro does.** In practice, 80% of ops are simple because of this.
+
+---
+
+## 2) When you _do_ want to touch V8 directly
+
+Most ops just need “data in/data out”. Sometimes you need the engine—e.g., to inspect objects, construct exotic values, or use embedder APIs.
+
+The console example shows the pattern:
+
+```rust
+use deno_core::op2;
+use deno_core::v8;
+
+deno_core::extension!(
+  deno_console,
+  ops = [op_preview_entries],
+  esm = ["01_console.js"],
+);
+
+#[op2]
+pub fn op_preview_entries<'s>(
+  scope: &mut v8::HandleScope<'s>,
+  object: &v8::Object,
+  slow_path: bool,
+) -> v8::Local<'s, v8::Value> {
+  let (entries, is_key_value) = object.preview_entries(scope);
+  match entries {
+    None => v8::undefined(scope).into(),
+    Some(entries) => {
+      if !slow_path {
+        return entries.into();
+      }
+
+      let ret: [v8::Local<v8::Value>; 2] =
+        [entries.into(), v8::Boolean::new(scope, is_key_value).into()];
+      v8::Array::new_with_elements(scope, &ret).into()
+    }
+  }
+}
+```
+
+Notes:
+
+- You can **opt into raw V8** by taking `&mut v8::HandleScope<'_>` and typed handles as parameters. The `#[op2]` trampoline knows how to pass them.
+- You **must** return handles created within that scope. Lifetimes (`'s`) enforce it, which prevents classic embedder mistakes (dangling handles across awaits).
+- The `deno_core::extension!` macro registers your op **and** wires the companion JS module (`01_console.js`) that calls it—this is how “console.\*” integrates as a first-class Web API.
+
+Use this path when you need fine control inside the isolate. For pure data shuttling, let `#[serde]` do the heavy lifting.
+
+---
+
+## 3) Long-lived things: resources, `rid`s, and OS handles
+
+Deno models OS things (files, sockets, subprocess stdio) as **resources**. A resource is a Rust type implementing `deno_core::Resource`, stored in a `ResourceTable`. JS only sees an integer **resource id** (`rid`) and calls ops that operate on it.
+
+Filesystem idioms:
+
+```rust
+#[derive(Debug, deno_error::JsError)]
+pub enum FsError {
+  #[class(inherit)] Io(std::io::Error),
+  #[class("Busy")]  FileBusy,
+  // ...
+}
+
+pub struct FileResource {
+  name: String,
+  file: std::rc::Rc<dyn File>,
+}
+
+impl deno_core::Resource for FileResource {
+  fn name(&self) -> std::borrow::Cow<'_, str> {
+    std::borrow::Cow::Borrowed(&self.name)
+  }
+
+  fn read(self: std::rc::Rc<Self>, limit: usize)
+    -> deno_core::AsyncResult<deno_core::BufView> {
+    Box::pin(async move {
+      self.file.clone().read(limit).await.map_err(deno_error::JsErrorBox::from_err)
+    })
+  }
+}
+```
+
+What happens in practice:
+
+1. A **create** op (e.g., `op_fs_open`) does permission checks, opens an OS file, wraps it in a `FileResource`, inserts it into `OpState.resource_table`, and returns an `rid` to JS.
+2. Subsequent **operate** ops (`op_fs_read`, `op_fs_write`, …) receive `rid`, fetch the `FileResource` from the table, and forward to the trait methods.
+3. When JS drops the last reference (or calls `Deno.close(rid)`), the resource is removed; RAII cleans up the OS handle.
+
+**Permissions** integrate naturally here—errors map to user-facing classes via `deno_error` annotations.
+
+---
+
+## 4) Zero-copy where it matters
+
+Deno has evolved its buffer story for performance and safety:
+
+- **`JsBuffer` (param) / `ToJsBuffer` (return):** ergonomic wrappers for passing byte slices into/out of V8 with minimal copying.
+- **`ZeroCopyBuf` (older idiom):** similar idea—operate on bytes without marshaling through JSON.
+- **`BufView`/`BufMutView`:** used by resource methods for BYOB patterns and to avoid intermediate allocations.
+
+Crypto uses `JsBuffer` for plaintext in, `ToJsBuffer` for ciphertext out. FS uses `BufView`/`BufMutView`. The goal is the same: **don’t move bytes unless you have to**.
+
+---
+
+## 5) Async without footguns: `spawn_blocking` and the isolate
+
+Rust async is cooperative. V8 is single-threaded per isolate. The rule of thumb:
+
+- **Small, non-blocking ops:** just `async fn` that awaits IO; they yield back quickly.
+- **CPU-bound work (crypto, compression, hashing):** `spawn_blocking` (Deno’s unsync pool) to avoid hogging the isolate thread.
+
+```rust
+let buf = deno_core::unsync::spawn_blocking(fun).await.unwrap()?;
+```
+
+**Don’t** hold V8 handles across an `await`. If you accept a `HandleScope`, finish V8 work before the first suspension point.
+
+---
+
+## 6) Putting ops into the runtime: the `extension!` macro
+
+Deno organizes subsystems as **extensions**. Each extension declares:
+
+- A set of ops (Rust functions with `#[op2]`).
+- Optional embedded JS/ESM modules that expose ergonomic APIs.
+- Optional state initialization.
+
+```rust
+deno_core::extension!(
+  deno_console,
+  ops = [op_preview_entries],
+  esm = ["01_console.js"],
+);
+```
+
+At runtime creation, Deno collects extensions and passes them to:
+
+```rust
+use deno_core::{JsRuntime, RuntimeOptions};
+
+let mut rt = JsRuntime::new(RuntimeOptions {
+  extensions: vec![deno_console::init()],
+  ..Default::default()
+});
+```
+
+The loader injects the ESM modules and makes ops available to that JS code. That’s how Web APIs become “built-ins” without shipping a giant monolith.
+
+---
+
+## 7) A quick end-to-end trace (WebCrypto)
+
+Path for `await crypto.subtle.encrypt(...)`:
+
+1. **Userland JS** calls the WebCrypto API (shipped as an ESM inside the `crypto` extension).
+2. That ESM validates arguments, then calls `op_crypto_encrypt` via `opAsync("op_crypto_encrypt", opts, data)`.
+3. **Trampoline** converts `opts` to `EncryptOptions` (serde) and `data` to `JsBuffer`.
+4. **Rust op body** chooses an algorithm, runs the CPU work on a blocking pool, maps any algorithmic errors to annotated `EncryptError`.
+5. **Return**: `ToJsBuffer` becomes a JS `Uint8Array`; the Promise resolves.
+
+Replace “crypto” with “fs read” or “console preview”; only the middle differs.
+
+---
+
+## 8) The parts that matter most
+
+- **AES/RSA helpers:** use typed aliases (`cbc::Encryptor<aes::Aes128>`), nonce typenum (`U12`/`U16`), CTR families, and tight error mapping. These don’t need V8 at all—**ops isolate the engine from your domain logic.**
+- **Console preview:** engine-facing op with strict handle lifetimes—**this is when you go to `rusty_v8`.**
+- **FS resources:** capability objects surfaced as `rid`s; clean permission and IO error mapping.
+
+---
+
+## 9) Where this lives in Deno’s tree (the “map”)
+
+- **`deno_core/` crate:** V8 isolate management, `JsRuntime`, `extension!`, `#[op2]`, buffers, resource table, event loop, inspector, `serde_v8`.
+- **`ext/<name>/`:** one extension per subsystem (`ext/crypto/`, `ext/console/`, `ext/fs/`, …).
+- **`cli/` or runtime crate:** assembles extensions, configures permissions, bootstraps isolate, loader, caching, flags.
+
+As a rule: **ops live with their extension**, and **core** holds the reusable embedding substrate.
+
+---
+
+## 10) Practical guidance for writing your own ops
+
+- **Start with ESM glue.** Design a minimal, Web-API-shaped surface and call an op by name.
+- **Use serde-friendly structs/enums.** Prefer tagged enums for “algorithm” switches.
+- **Use `#[buffer]`/`JsBuffer` for bytes.**
+- **Return `Result<T, E>` where `E: deno_error::JsError`.** Annotate `#[class]` for web parity.
+- **Reserve `v8::HandleScope`** for cases that need engine access.
+- **Avoid blocking the isolate;** `spawn_blocking` CPU work.
+- **Don’t cross `await` with V8 handles.**
+- **Resource-ize OS things.**
+- **Test with a tiny `JsRuntime`.** Drive it with a short JS snippet.
+
+---
+
+## 11) A compact skeleton
+
+**Rust (op + extension):**
+
+```rust
+use deno_core::{op2, Extension, JsRuntime, RuntimeOptions, JsBuffer, ToJsBuffer};
+
+#[op2(async)]
+pub async fn op_hash_echo(#[buffer] data: JsBuffer) -> Result<ToJsBuffer, MyErr> {
+  let out = deno_core::unsync::spawn_blocking(move || {
+    let mut v = data.to_vec();
+    v.reverse();
+    Ok::<_, MyErr>(v)
+  }).await??;
+  Ok(out.into())
+}
+
+pub fn init() -> Extension {
+  Extension::builder("my_ext")
+    .ops(vec![op_hash_echo::decl()])
+    .esm(vec![("ext:my_ext/init.js", include_str!("init.js"))])
+    .build()
+}
+```
+
+**JS (glue):**
+
+```js
+// ext:my_ext/init.js
+import { opAsync } from "ext:core/ops";
+export async function reverseBytes(u8) {
+  return new Uint8Array(await opAsync("op_hash_echo", u8));
+}
+```
+
+**Harness:**
+
+```rust
+let mut rt = JsRuntime::new(RuntimeOptions { extensions: vec![init()], ..Default::default() });
+rt.execute_script("<main>", r#"
+  import { reverseBytes } from "ext:my_ext/init.js";
+  const result = await reverseBytes(new Uint8Array([1,2,3]));
+  globalThis.out = Array.from(result);
+"#)?;
+```
+
+---
+
+## 12) Why this architecture feels good
+
+- **Safety by default:** isolate threading + lifetimes prevent classic embedder bugs.
+- **Performance where it counts:** zero-copy buffers; explicit blocking pools for CPU work.
+- **Testability:** boot a `JsRuntime` in a unit test; exercise everything like a user would.
+- **Web parity:** error classes and API shapes match platform expectations.
+
+---
+
+## TL;DR
+
+- **Ops** are Rust fns with `#[op2]`—serialize args/results, sync or async.
+- **Resources** wrap OS state and live in a `ResourceTable` (`rid`s to JS).
+- **`rusty_v8`** gives raw engine access when needed; otherwise let `serde_v8` move data.
+- **Never block** the isolate; use `spawn_blocking`.
+- **Ship as an extension** with ESM glue; test in a tiny `JsRuntime`.

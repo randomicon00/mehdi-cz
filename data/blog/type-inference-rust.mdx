@@ -1,0 +1,81 @@
+---
+title: "Understanding Type Inference in Rust"
+date: "2025-02-23"
+tags: ["rust", "type inference", "programming concepts"]
+draft: false
+summary: Learn how Rust's type inference works, including special cases like function pointers and the never type (`!`).
+---
+
+### Type Inference in Rust
+
+The idea for this article came to me through my work with **Rust Analyzer**, where I often deal with type inference complexities in real-world scenarios. Rust's type inference system is a powerful feature that makes code more concise while ensuring type safety, but it can have subtle behaviors, especially with edge cases like function pointers and the never type (`!`).
+
+### Basics
+
+- Rust infers types based on context.
+- Types are determined from assignments, function returns, and usage.
+- Type annotations are optional unless ambiguity exists.
+
+Example:
+
+```rust
+let x = 42;  // Rust infers `x` as `i32`
+```
+
+### Special Case 1: Function and Closure Types
+
+When dealing with functions or closures, Rust can infer the types for arguments and return values.
+
+Example:
+
+```rust
+let add = |a, b| a + b;  // Rust infers `add` as `fn(i32, i32) -> i32`
+```
+
+If different branches return **different** closures, Rust may coerce them into function pointers to ensure compatibility.
+
+```rust
+let f = if condition {
+    |x| x + 1  // inferred as `fn(i32) -> i32`
+} else {
+    |y| y - 1  // inferred as `fn(i32) -> i32`
+};
+```
+
+### Special Case 2: Diverging Types and `!`
+
+The never type (`!`) is used for functions that never return, like `panic!()`.
+
+Example:
+
+```rust
+fn foo() -> ! { panic!(); }
+```
+
+When combining types, Rust can coerce `!` into any type to allow flow control to continue properly.
+
+```rust
+let x = if condition {
+    42  // inferred as `i32`
+} else {
+    panic!()  // inferred as `!`, coerced to `i32`
+};
+```
+
+### Special Case 3: Merging Number Types
+
+When different numeric types appear in separate branches, Rust attempts to merge them through type inference. For instance, if one branch returns an integer and another returns a floating-point number, Rust must decide on a compatible type.
+
+```rust
+let result = if condition {
+    5  // inferred as `i32`
+} else {
+    5.0  // inferred as `f64`
+};
+```
+
+In this case, Rust cannot automatically infer a common type because `i32` and `f64` are distinct types. You would need to explicitly cast one of the values to match the other, or provide a type annotation.
+
+### Conclusion
+
+Rust's type inference is powerful. It works seamlessly in most scenarios and handles special cases like function pointers and the never type (`!`). This results in clean, readable, and concise code without losing the benefits of a strongly typed system.

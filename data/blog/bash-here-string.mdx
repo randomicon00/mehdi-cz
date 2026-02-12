@@ -1,0 +1,14 @@
+---
+title: "Here-strings (<<<)"
+
+date: "2025-09-16"
+tags: ["bash", "til"]
+draft: false
+summary: "Here-strings (`<<<`) feed a short string as stdin to a command."
+---
+
+```bash
+grep foo <<< "one two foo"
+```
+
+Tip: For multi-line input use a here-doc instead (`<<'EOF'`).

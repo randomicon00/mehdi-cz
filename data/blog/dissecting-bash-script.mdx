@@ -1,0 +1,184 @@
+---
+title: "Dissecting a Bash Script as a Way to Learn Bash"
+date: "2024-12-01"
+tags: ["bash", "scripting", "shell", "learning"]
+draft: false
+summary: "Exploring Bash scripting fundamentals by dissecting a real-world Bash script, step-by-step, to understand key concepts like functions, loops, and error handling."
+---
+
+As I started diving more seriousely into Bash scripting, I realized that dissecting a real-world script could give me a deeper understanding of Bash’s nuances than just reading documentation. This approach allows me to see everything in context, like variable handling, error trapping, and loops, while actively experimenting along the way.
+
+Below, I’ll walk you through my learning process with a Bash script designed to generate social media images from blog post titles. By breaking down each piece, we’ll uncover key Bash concepts and practices that power the script.
+
+---
+
+### The Script: Purpose and Overview
+
+The script’s goal is to:
+
+1. Extract titles from blog post files.
+2. Generate a social image with the title using `ImageMagick`.
+3. Save each image in a designated folder for easy access.
+
+Here's the script we're dissecting:
+
+```bash
+#!/bin/bash
+
+set -euo pipefail
+
+# Function to generate social image for a given title
+generate_social_image() {
+    local title="$1"
+    local output_file="$2"
+
+    magick -background none -fill '#000000' -font Inter-Bold -pointsize 80 -size 670x caption:"$title" text.png
+    magick static/social/social-post-template.svg text.png -gravity northwest -geometry +80+80 -composite "$output_file"
+}
+
+process_post() {
+    local post="$1"
+    local post_filename="$2"
+
+    title=$(awk -F '= ' '/title/ {gsub(/"/, "", $2); print $2}' "$post")
+
+    if [[ -z "$title" ]]; then
+        echo "Title not found in $post. Skipping."
+        return
+    fi
+
+    output_path="static/social/rendered/${post_filename}.png"
+
+    if [[ -f "$output_path" ]]; then
+        echo "File already exists: $output_path. Skipping."
+        return
+    fi
+
+    echo "Generating $title ($output_path)"
+    generate_social_image "$title" "$output_path"
+}
+
+for item in content/blog/*; do
+    if [[ $(basename "$item") == _* ]]; then
+        continue
+    fi
+
+    if [[ -d "$item" && -f "$item/index.md" ]]; then
+        process_post "$item/index.md" "$(basename "$item")"
+    elif [[ -f "$item" ]]; then
+        process_post "$item" "$(basename "$item" .md)"
+    fi
+done
+
+for item in content/*; do
+    if [[ $(basename "$item") == _* ]]; then
+        continue
+    fi
+
+    if [[ -d "$item" && -f "$item/_index.md" ]]; then
+        process_post "$item/_index.md" "$(basename "$item")"
+    fi
+done
+
+rm -f text.png
+```
+
+### Dissecting the Script
+
+#### 1. Script Header and set Flags
+
+```bash
+#!/bin/bash
+set -euo pipefail
+```
+
+Shebang (`#!/bin/bash`): Specifies Bash as the interpreter.
+
+- set `-euo` pipefail: These flags enforce strict error handling:
+- `-e`: Exit if any command fails.
+- `-u`: Treat unset variables as errors.
+- `-o` pipefail: Fail if any command in a pipeline fails, not just the last one.
+
+#### 2. Defining a Function with generate_social_image
+
+```bash
+generate_social_image() {
+    local title="$1"
+    local output_file="$2"
+    magick -background none -fill '#000000' -font Inter-Bold -pointsize 80 -size 670x caption:"$title" text.png
+    magick static/social/social-post-template.svg text.png -gravity northwest -geometry +80+80 -composite "$output_file"
+}
+```
+
+The `generate_social_image` function does the heavy lifting by:
+
+- Creating a caption image with magick using the given title.
+- Compositing the caption over a background template to generate a social media post.
+
+**Takeaway**: Functions in Bash are created without explicit parameter definitions—parameters are accessed by $1, $2, etc., allowing flexibility but requiring clarity in function comments and usage.
+
+#### 3. Extracting Titles with process_post
+
+```bash
+process_post() {
+    local post="$1"
+    local post_filename="$2"
+    title=$(awk -F '= ' '/title/ {gsub(/"/, "", $2); print $2}' "$post")
+
+    if [[ -z "$title" ]]; then
+        echo "Title not found in $post. Skipping."
+        return
+    fi
+
+    output_path="static/social/rendered/${post_filename}.png"
+
+    if [[ -f "$output_path" ]]; then
+        echo "File already exists: $output_path. Skipping."
+        return
+    fi
+
+    echo "Generating $title ($output_path)"
+    generate_social_image "$title" "$output_path"
+}
+
+```
+
+The `process_post` function:
+
+- Extracts the title from the blog post’s front matter using awk.
+- Checks if the title is empty, then skips the post if it is.
+- Calls `generate_social_image` to create the image.
+
+**Takeaway**: `awk` is a powerful tool for text parsing and is widely used in Bash scripts to extract and manipulate text data. Here, it uses regex to find the title and removes surrounding quotes.
+
+#### 4. Looping Through Files and Folders
+
+```bash
+for item in content/blog/*; do
+    if [[ $(basename "$item") == _* ]]; then
+        continue
+    fi
+
+    if [[ -d "$item" && -f "$item/index.md" ]]; then
+        process_post "$item/index.md" "$(basename "$item")"
+    elif [[ -f "$item" ]]; then
+        process_post "$item" "$(basename "$item" .md)"
+    fi
+done
+```
+
+This loop goes through files and folders in `content/blog/`, skipping items prefixed with \_. The `process_post` function handles each markdown file (`index.md` or individual files).
+
+**Takeaway**: Bash’s for loop is a powerful way to iterate over file structures, and basename helps extract filenames without paths for consistent handling.
+
+#### 5. Removing Temporary Files
+
+```bash
+rm -f text.png
+```
+
+Finally, the script deletes the `text.png` file used temporarily by `generate_social_image`. The `-f` flag ensures no error is thrown if the file doesn’t exist.
+
+**Takeaway**: Temporary files are common in scripts and should be cleaned up to avoid clutter.
+
+> This script is from [Corrode](https://corrode.dev), a Rust consultancy, and has been adapted from their GitHub repository. You can find the original [here on GitHub](https://github.com/corrode/corrode.github.io/blob/master/scripts/social.sh).

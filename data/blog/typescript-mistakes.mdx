@@ -1,0 +1,76 @@
+---
+title: "Top 5 Common TypeScript Mistakes"
+date: "2025-03-10"
+tags: ["typescript", "best practices", "common mistakes"]
+draft: false
+summary: Avoid these common TypeScript mistakes to write cleaner, more robust code.
+---
+
+### 1. Ignoring `any` Type
+
+While `any` may seem like an easy solution for type issues, it defeats the purpose of TypeScript’s static typing. Use stricter types like `unknown` or define explicit types for better safety and maintainability.
+
+```ts
+function fetchData(url: any) {
+  // BAD: `any` type used for the parameter
+  return fetch(url);
+}
+
+function fetchDataTyped(url: string): Promise<Response> {
+  // GOOD: Explicitly typed parameter and return type
+  return fetch(url);
+}
+```
+
+### 2. Overusing Type Assertions
+
+Type assertions (`as Type`) can lead to runtime errors if overused or applied incorrectly. Always prefer type guards or function overloads over assertions to avoid unwanted type coercion.
+
+```ts
+const value: any = "123";
+const num: number = value as number; // BAD: Incorrect assertion, can cause runtime errors
+
+if (typeof value === "number") {
+  const num: number = value; // GOOD: Proper type checking before usage
+}
+```
+
+### 3. Forgetting to Narrow Types
+
+Not narrowing union types before accessing properties or methods can lead to errors. Use control flow-based narrowing like `if`, `typeof`, or `instanceof` to ensure the value is properly narrowed before usage.
+
+```ts
+function logLength(input: string | number) {
+  console.log(input.length); // BAD: Property 'length' does not exist on type 'number'
+
+  if (typeof input === "string") {
+    console.log(input.length); // GOOD: Proper narrowing before accessing 'length'
+  }
+}
+```
+
+### 4. Misusing `any[]` Instead of Typed Arrays
+
+Using `any[]` for arrays leads to loss of type safety. Always specify array types (`string[]`, `number[]`) to avoid unexpected values sneaking into your arrays.
+
+```ts
+const items: any[] = [1, "two", true]; // BAD: Allows mixed types
+
+const numbers: number[] = [1, 2, 3]; // GOOD: Ensures only numbers are allowed
+```
+
+### 5. Neglecting `strictNullChecks`
+
+Leaving `strictNullChecks` off can cause bugs when dealing with `null` or `undefined`. Always enable `strictNullChecks` to ensure your code handles nullability correctly.
+
+```ts
+function greet(name: string | null) {
+  console.log(`Hello, ${name.toUpperCase()}`); // BAD: 'null' is not handled, can cause runtime errors
+
+  if (name !== null) {
+    console.log(`Hello, ${name.toUpperCase()}`); // GOOD: Nullability is checked
+  }
+}
+```
+
+By avoiding these common pitfalls, you can take full advantage of TypeScript’s type system to build more reliable and maintainable applications.

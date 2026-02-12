@@ -1,0 +1,32 @@
+---
+title: "Go WebSocket Streaming: Send Small Messages"
+date: "2025-09-17"
+tags: ["go", "streaming", "realtime"]
+draft: false
+summary: "Use WebSockets for live text or small JSON. Keep messages tiny and clear."
+---
+
+When you need low-latency updates, WebSockets are simple and fast.
+
+## Code (short)
+
+```go
+var upgrader = websocket.Upgrader{}
+
+func ws(w http.ResponseWriter, r *http.Request) {
+  c, _ := upgrader.Upgrade(w, r, nil)
+  defer c.Close()
+  for {
+    _, msg, err := c.ReadMessage()
+    if err != nil { return }
+    // echo back
+    c.WriteMessage(websocket.TextMessage, msg)
+  }
+}
+```
+
+## Tips
+
+- Use ping/pong to keep alive
+- Limit message size
+- Auth before upgrade if needed

@@ -1,0 +1,41 @@
+---
+title: "TIL: Dynamic Object Keys in JavaScript"
+date: "2024-12-09"
+tags: ["javascript", "react", "objects", "dynamic keys"]
+draft: false
+summary: "Learn how to use computed property names in JavaScript to dynamically set object keys based on variables."
+---
+
+When working with JavaScript objects, there are times when you need to use a variable as a key, rather than a fixed string. This is where "computed property names" come into play, using square brackets to dynamically assign object keys.
+
+Here’s an example:
+
+```js
+const inputKey = "name";
+const value = "John";
+
+// Without brackets
+const obj = {
+  inputKey: value, // The key is literally "inputKey"
+};
+
+// With brackets
+const obj = {
+  [inputKey]: value, // The key is "name" (value of inputKey)
+};
+```
+
+In the first case, the object will have a key `"inputKey"`. In the second, the key will be whatever value `inputKey` holds — in this case, `"name"`.
+
+This technique is super useful when building objects dynamically, especially in cases like updating state in React:
+
+```js
+setInputValues((prevState) => ({
+  ...prevState,
+  [inputKey]: value, // Dynamically setting the key
+}));
+```
+
+By using `[inputKey]`, we ensure that the actual value of `inputKey` is used as the property name, giving us flexibility in constructing objects based on variables.
+
+This small trick is a powerful tool to make your code more dynamic and flexible!

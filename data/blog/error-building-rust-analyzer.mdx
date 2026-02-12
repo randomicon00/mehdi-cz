@@ -1,0 +1,66 @@
+---
+title: "Fixing Rust Analyzer Build Errors: Clearing Cache and Updating"
+date: "2024-12-26"
+tags: ["Rust", "Rust Analyzer", "Build Issues", "Cache Cleaning", "Manjaro"]
+draft: false
+summary: "A simple guide to fixing common Rust Analyzer build errors by cleaning the Cargo cache and updating Rust to the latest version."
+---
+
+When building Rust Analyzer, you might encounter unexpected compilation errors related to some dependencies. A common issue looks like this:
+
+```plaintext
+error: expected item, found keyword `let`
+   --> /home/medvih/.cargo/registry/src/index.crates.io-6f17d22bba15001f/la-arena-0.3.1/src/lib.rs:529:1
+    |
+529 | let mut arena = Arena::new();
+    | ^^^ `let` cannot be used for global variables
+```
+
+This error typically means that the dependencies you're trying to compile contain some invalid Rust code, such as a `let` statement being used globally, which is not allowed in Rust. Here's how to solve the issue using two simple steps: **cleaning the Cargo cache** and **updating Rust**.
+
+### Step 1: Update Rust
+
+The first thing you should do is ensure that you have the latest stable version of Rust. Many times, these kinds of compilation issues arise because the code you are trying to build requires newer language features or bug fixes that are present in a more recent Rust release. To update Rust, run:
+
+```bash
+rustup update
+```
+
+This command will ensure you have the latest stable version, which often contains important bug fixes or features required by certain dependencies.
+
+### Step 2: Clean the Cargo Cache
+
+The next step is to clear the Cargo cache, as it might contain outdated or corrupted versions of dependencies that are causing the build issues.
+
+```bash
+cargo clean
+rm -rf ~/.cargo/registry
+```
+
+- **`cargo clean`** removes any build artifacts from your project.
+- **`rm -rf ~/.cargo/registry`** clears the cached versions of all dependencies, forcing Cargo to download fresh copies the next time you build.
+
+### Building Rust Analyzer From Source
+
+After completing the above two steps, you can now build Rust Analyzer from source:
+
+```bash
+git clone https://github.com/rust-lang/rust-analyzer.git && cd rust-analyzer
+cargo xtask install
+```
+
+This will install both the server and the VS Code plugin. You’ll need **Cargo**, **nodejs** (matching a supported version of VS Code), and **npm** for this process.
+
+> Note: If you are using VS Code Remote, installing via `cargo xtask install` might not work. In such cases, you need to manually install the `.vsix` file.
+
+If you are not using VS Code, you can compile and install only the LSP (Language Server Protocol) server:
+
+```bash
+cargo xtask install --server
+```
+
+Make sure that `.cargo/bin` is in your `$PATH` and precedes any other paths where `rust-analyzer` may also be installed. This is particularly important if you are planning to use a source build or even a downloaded binary, as `rustup` includes a proxy called `rust-analyzer` that could cause conflicts.
+
+### Why Does This Work?
+
+The error was caused by either outdated dependencies or an incompatible Rust version. By updating your Rust toolchain and cleaning the cache, you are ensuring that you have compatible and up-to-date dependencies, thus eliminating the errors.

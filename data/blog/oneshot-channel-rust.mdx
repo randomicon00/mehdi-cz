@@ -1,0 +1,128 @@
+---
+title: "Building an Async Oneshot Channel in Rust: A Simple Guide"
+date: "2025-01-21"
+tags: ["rust", "concurrency", "oneshot channel", "async programming", "futures"]
+draft: false
+summary: Learn how to build a dependency-free async oneshot channel in Rust, allowing you to send a single value between tasks with thread-safe guarantees.
+---
+
+When building async systems in Rust, understanding the fundamental tools of concurrency is essential. One useful primitive is the **oneshot channel**, which allows for **single-value communication** between tasks. Let’s dive into how you can build a **dependency-free async oneshot channel** from scratch.
+
+### What is a Oneshot Channel?
+
+A **oneshot channel** is a communication primitive that allows one task to send a **single value** to another. This kind of channel is ideal for situations where you need a one-time response, like **request-response mechanisms** in concurrent systems.
+
+Here’s a simple use case:
+
+```rust
+use async_oneshot_channel::oneshot;
+use futures::executor::block_on;
+
+// Create a oneshot channel
+let (tx, rx) = oneshot();
+
+// Send a value
+block_on(async {
+    tx.send(42).unwrap();
+});
+
+// Receive the value asynchronously
+let result = block_on(rx.recv());
+assert_eq!(result, Some(42));
+```
+
+In this example, the **sender** (`tx`) sends a value, and the **receiver** (`rx`) awaits the value asynchronously.
+
+### Why Use Oneshot Channels?
+
+Oneshot channels provide a **simple** and **reliable** way to communicate between different parts of an application, especially when **asynchronous tasks** are involved. Imagine a scenario where you have a worker thread that needs to compute a value and report back. Using a oneshot channel allows you to:
+
+1. **Send a response exactly once**—avoiding confusion or ambiguity.
+2. **Simplify resource cleanup** by automatically closing channels when done.
+3. **Synchronize tasks** without busy-waiting.
+
+### Building the Oneshot Channel
+
+The core components of a oneshot channel are:
+
+- A **sender** to send a value.
+- A **receiver** that waits asynchronously for the value.
+
+To ensure asynchronous compatibility, we need to implement the **Future** trait for our receiver. The **waker** mechanism will be used to notify the executor when the value is available.
+
+#### Key Implementation Highlights
+
+- **Mutex and OnceLock**: To ensure that the value is safely accessed and set only once, we use a combination of a `Mutex` to provide exclusive access and a `OnceLock` to store the **waker**.
+- **Futures and Polling**: We define a custom `Future` for the receiver, which either returns `Poll::Ready(value)` if the value is available, or stores the **waker** for later notification when `Poll::Pending` is returned.
+
+Here’s a snippet from the implementation:
+
+```rust
+use std::sync::{Arc, Mutex, OnceLock};
+use std::task::{Context, Poll, Waker};
+use std::future::Future;
+
+pub struct OneshotChan<T> {
+    inner: Mutex<Option<T>>,
+    waker: OnceLock<Waker>,
+}
+
+impl<T> OneshotChan<T> {
+    pub fn send(&self, value: T) -> Result<(), T> {
+        let mut inner = self.inner.lock().unwrap();
+        if inner.is_some() {
+            return Err(value);
+        }
+        *inner = Some(value);
+
+        if let Some(waker) = self.waker.get() {
+            waker.wake_by_ref();
+        }
+        Ok(())
+    }
+}
+```
+
+In this example, `send()` sets the value and uses the waker to notify the receiver that it can resume execution.
+
+### Using the Waker
+
+The **waker** is a key part of Rust’s async runtime. It allows the receiver task to register itself and be woken up by the sender when the value is ready. This prevents **busy-waiting**, making the oneshot channel highly efficient in scenarios where tasks must wait for an event to occur.
+
+### Optimization Considerations
+
+To make the oneshot channel efficient, it's important to ensure that the tasks involved are not overly resource-consuming. The **oneshot channel** is most effective when the tasks are lightweight and do not hold up system resources for long periods. Since the receiver waits asynchronously, it’s crucial that tasks yield properly, allowing other operations to proceed smoothly without being blocked. Properly managing resources and avoiding heavy computation within tasks can help maintain the efficiency and responsiveness of the async system.
+
+### Drawbacks of Oneshot Channels
+
+While oneshot channels are useful for one-time communications, they do come with limitations:
+
+- **Single Use**: A oneshot channel can only be used to send a single value. If you need continuous or repeated communication, a different channel type like `mpsc` would be more appropriate.
+- **Limited Scalability**: Oneshot channels work best when the tasks are lightweight and the communication is infrequent. For more frequent interactions, the overhead of creating new channels repeatedly can be inefficient.
+- **Dependency on Task Responsiveness**: Since oneshot channels rely on wakers to notify receivers, the tasks involved should yield control in a timely manner. If tasks are blocking or consume significant CPU time, the efficiency of the oneshot channel is compromised, making it less effective for high-load scenarios.
+
+### Summary
+
+The **oneshot channel** is a powerful tool for managing single-use communications in async Rust. By building it from scratch, we gain insight into how **Futures**, **wakers**, and **thread-safe primitives** like `OnceLock` and `Mutex` work together to provide efficient, non-blocking task synchronization. This approach is foundational for understanding how more complex async operations are managed in Rust.
+
+### FAQ
+
+**1. When should I use a oneshot channel instead of other channel types?**
+
+Oneshot channels are ideal for **one-time communication** between tasks. If you need a simple way to send a value once and then close the channel, a oneshot is perfect. For more complex, multi-message communication, consider using `mpsc` (multi-producer, single-consumer) channels.
+
+**2. Can I send multiple values using a oneshot channel?**
+
+No, a oneshot channel is designed to send **only one value**. If you need to send multiple values, you should use other channels like `mpsc` or `broadcast` channels.
+
+**3. How does the waker mechanism work in the oneshot channel?**
+
+The **waker** is used to notify the executor when the receiver can proceed. When the sender sets the value, it calls the waker to wake up the receiver, allowing it to continue execution and retrieve the value without busy-waiting.
+
+**4. What happens if the sender is dropped before sending a value?**
+
+If the sender is dropped before sending a value, the receiver will be notified that no value will arrive. This prevents the receiver from waiting indefinitely.
+
+**5. Is the oneshot channel thread-safe?**
+
+Yes, the oneshot channel uses synchronization primitives like `Mutex` and `OnceLock` to ensure that it is **thread-safe**, allowing safe usage across multiple threads.

@@ -1,0 +1,59 @@
+---
+title: "TIL: Registering Inputs through a Form Provider in React"
+date: "2024-11-09"
+tags: ["react", "forms", "design-pattern", "hooks"]
+draft: false
+summary: "Learn how the form provider design pattern helps manage input registration, validation, and state control in complex React forms."
+---
+
+When building complex forms in React, managing input values, validation, and interaction between inputs can get tricky. A common solution to this is the **Form Provider Design Pattern**, which allows form components and inputs to communicate and share state via a context.
+
+## How It Works
+
+In this pattern, the `FormProvider` acts as a central context for managing the form's state. The inputs are **registered** within this provider, allowing the form to manage each input’s state, values, errors, and validation seamlessly.
+
+Here's a breakdown of the approach:
+
+1. **Registering Inputs**: Each input component (e.g., text fields) is **registered** through the `FormProvider` when it mounts. The registration process ensures that the form knows about the input and its associated metadata (such as `value`, `onBlur`, `onChange` handlers, etc.).
+
+```javascript
+const registerInput = useCallback(
+  (inputID, shouldSubmitForm, inputProps) => {
+    // Add input to the form's refs for tracking
+    const newRef = inputRefs.current[inputID] ?? createRef();
+    inputRefs.current[inputID] = newRef;
+    // Store input's value and props
+    inputValues[inputID] = inputProps.value || getDefaultValue(inputProps);
+    // Return properties to the input for handling events
+    return {
+      ...inputProps,
+      onBlur: handleBlur,
+      onChange: handleChange,
+      value: inputValues[inputID],
+      errorText: errors[inputID],
+    };
+  },
+  [inputValues, errors]
+);
+```
+
+2. **Controlled Inputs**: Inputs are controlled components, meaning their `value` is determined by the state inside the `FormProvider`. This allows for centralized validation, error handling, and even dynamic updates.
+
+```javascript
+<InputComponent
+  key={key}
+  {...registerInput(inputID, shouldSubmitForm, { ref, valueType, ...props })}
+/>
+```
+
+3. **Validation & State Control**: The form provider also manages validation through functions that check inputs as they lose focus (`onBlur`) or when their values change (`onChange`). Errors are tracked centrally and passed down to individual inputs for displaying error messages.
+
+4. **Separation of Concerns**: This design pattern keeps the logic for managing form state, input validation, and submission separate from the UI components themselves, leading to cleaner, more maintainable code.
+
+## Benefits
+
+- **Centralized Input Management**: All inputs in the form are registered and managed in one place, making it easier to handle complex forms.
+- **Validation Control**: Validation rules can be applied consistently across the form and handled dynamically.
+- **Clean UI Components**: Since the form logic is abstracted away, input components only need to focus on rendering, keeping them clean and reusable.
+
+This pattern is incredibly useful for large, multi-step forms or forms with complex validation logic, offering flexibility and control over the form's behavior.

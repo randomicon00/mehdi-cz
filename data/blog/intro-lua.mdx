@@ -1,0 +1,335 @@
+---
+title: "Introduction to Lua"
+date: "2025-02-20"
+draft: true
+tags: ["Lua", "Programming Languages", "Game Development", "Scripting"]
+summary: "A concise introduction to Lua, a lightweight, embeddable scripting language popular in gaming, IoT, and web applications."
+---
+
+Lua is a lightweight, high-level, and fast programming language designed primarily for embedded systems and scripting purposes. Created in 1993 by Roberto Ierusalimschy, Luiz Henrique de Figueiredo, and Waldemar Celes, Lua's simplicity and performance make it a popular choice for various industries, especially in game development and IoT applications.
+
+### Key Features
+
+- **Lightweight and Fast**: Lua's interpreter has a very small memory footprint, which allows it to run efficiently even on devices with limited resources.
+- **Embeddable**: Lua is designed to be embedded into other applications, enabling developers to extend applications by providing a scripting language that is easy to integrate.
+- **Extensible**: Lua's design encourages extending the language with libraries, providing flexibility for developers to adapt the language to their needs.
+- **Simple Syntax**: Its clean and minimalistic syntax makes it easy to learn for beginners and adaptable for professionals.
+- **Dynamic Typing**: Lua uses dynamic typing, meaning you don't need to declare variable types beforehand, allowing for flexible code.
+- **Cross-Platform**: Lua is cross-platform and works on a variety of operating systems, such as Windows, macOS, Linux, and others.
+
+### Use Cases
+
+Lua's versatility has led to its adoption across different fields:
+
+- **Game Development**: Lua is widely used in the gaming industry. It powers engines like Corona SDK, CryEngine, and Roblox, offering scripting capabilities that allow for rapid prototyping and customization.
+- **Internet of Things (IoT)**: With its lightweight nature, Lua is ideal for embedded systems and IoT devices, as seen in frameworks like NodeMCU, which uses Lua for ESP8266 and ESP32 devices.
+- **Web Applications**: Lua can be used for server-side scripting, and it integrates with web frameworks like Lapis, which leverages the power of Lua in web development.
+- **Scripting in Software**: Popular software such as Adobe's Lightroom and VLC Media Player also rely on Lua for scriptable extensions and automations.
+
+### Syntax Overview
+
+**Variables and Data Types** Lua uses dynamic typing, meaning variable types are determined at runtime.
+
+```lua
+local name = "Lua"   -- String type
+local age = 28       -- Number type
+local isDeveloper = true -- Boolean type
+```
+
+**Functions** Functions are first-class citizens in Lua and can be stored in variables, passed as arguments, or returned from other functions.
+
+```lua
+function add(a, b)
+    return a + b
+end
+
+print(add(5, 3))  -- Outputs: 8
+```
+
+**Tables (Lua's Arrays and Dictionaries)** Lua tables are versatile structures that can act as arrays, dictionaries (key-value pairs), or even both.
+
+```lua
+-- Array-like table
+local fruits = {"apple", "banana", "cherry"}
+print(fruits[1]) -- Outputs: apple
+
+-- Dictionary-like table
+local person = {name = "John", age = 30}
+print(person.name) -- Outputs: John
+```
+
+**Loops (For and While)** Lua provides several types of loops, including for and while.
+
+```lua
+-- Numeric for loop
+for i = 1, 5 do
+    print(i)  -- Outputs numbers from 1 to 5
+end
+
+-- While loop
+local counter = 1
+while counter <= 3 do
+    print("Count:", counter)  -- Outputs Count: 1, Count: 2, Count: 3
+    counter = counter + 1
+end
+```
+
+**Conditional Statements** Lua supports typical conditional logic using if, elseif, and else.
+
+```lua
+local age = 18
+if age < 18 then
+    print("You are a minor.")
+elseif age == 18 then
+    print("You are exactly 18.")
+else
+    print("You are an adult.")
+end
+```
+
+**Nil (Null in Lua)** The value nil represents the absence of a value in Lua. It is often used to check if something exists or has been assigned.
+
+```lua
+local name = nil
+if name == nil then
+    print("No name provided")
+end
+```
+
+**Metatables and Metamethods** Metatables allow you to change the behavior of tables. Metamethods like **add, **sub can overload Lua’s default behavior for custom operations.
+
+```lua
+local mt = {}
+mt.__add = function(a, b)
+    return a + b
+end
+
+local t1, t2 = {val = 1}, {val = 2}
+setmetatable(t1, mt)
+setmetatable(t2, mt)
+print(t1 + t2)  -- Outputs: 3
+```
+
+**Closures** Lua allows you to create functions within functions that retain access to local variables from the parent scope, creating closures.
+
+```lua
+function outer()
+    local count = 0
+    return function()
+        count = count + 1
+        return count
+    end
+end
+
+local counter = outer()
+print(counter())  -- Outputs: 1
+print(counter())  -- Outputs: 2
+```
+
+**Coroutines** Coroutines in Lua are collaborative threads that allow multiple functions to yield and resume their executions.
+
+```lua
+local co = coroutine.create(function ()
+    for i = 1, 3 do
+        print("Coroutine: ", i)
+        coroutine.yield()  -- Suspend the coroutine
+    end
+end)
+
+coroutine.resume(co)  -- Outputs: Coroutine: 1
+coroutine.resume(co)  -- Outputs: Coroutine: 2
+```
+
+**Error Handling** Lua uses the pcall (protected call) and xpcall functions for error handling.
+
+```lua
+local function riskyOperation()
+    error("Something went wrong!")
+end
+
+local success, err = pcall(riskyOperation)
+if not success then
+    print("Caught an error: " .. err)
+end
+```
+
+**Multiple Return Values** Lua functions can return multiple values, allowing for convenient assignment.
+
+```lua
+function divide(a, b)
+    return a // b, a % b  -- Returns quotient and remainder
+end
+
+local quotient, remainder = divide(10, 3)
+print(quotient, remainder)  -- Outputs: 3, 1
+```
+
+**Variable-Length Argument Lists** Functions can take a variable number of arguments using ....
+
+```lua
+function sum(...)
+    local total = 0
+    for _, v in ipairs({...}) do
+        total = total + v
+    end
+    return total
+end
+
+print(sum(1, 2, 3, 4))  -- Outputs: 10
+```
+
+**Global and Local Variables By default**, Lua variables are global unless declared as local.
+
+```lua
+local x = 10  -- Local variable
+y = 20        -- Global variable
+
+function testScope()
+    print(x)  -- Accessible inside the function
+    print(y)  -- Global variable, accessible anywhere
+end
+```
+
+**Modules Lua** supports the use of modules to organize code.
+
+```lua
+-- In mathmodule.lua
+local mathmodule = {}
+
+function mathmodule.square(x)
+    return x * x
+end
+
+return mathmodule
+
+-- In another file
+local mathmodule = require("mathmodule")
+print(mathmodule.square(4))  -- Outputs: 16
+```
+
+**Standard Libraries** Lua has built-in libraries for tasks like string manipulation, math, and I/O.
+
+```lua
+local s = "Hello, Lua!"
+print(string.upper(s))  -- Outputs: HELLO, LUA!
+
+local sqrt = math.sqrt(16)
+print(sqrt)  -- Outputs: 4
+```
+
+**Custom Iterators** Lua allows you to create custom iterators using coroutine or closures.
+
+```lua
+function range(start, finish)
+    return function()
+        if start <= finish then
+            local value = start
+            start = start + 1
+            return value
+        end
+    end
+end
+
+for num in range(1, 5) do
+    print(num)  -- Outputs: 1 2 3 4 5
+end
+```
+
+**Garbage Collection** Lua provides automatic memory management using garbage collection, but you can control it with functions like collectgarbage.
+
+```lua
+collectgarbage("collect")  -- Manually trigger garbage collection
+print(collectgarbage("count"))  -- Outputs the current memory usage in kilobytes
+```
+
+**Debugging** Lua provides a debug library for introspection and debugging.
+
+```lua
+function myFunction()
+    local info = debug.getinfo(1)
+    print(info.name, info.currentline)  -- Prints function info
+end
+
+myFunction()
+```
+
+**File I/O** Lua supports file input/output operations via the io library.
+
+```lua
+-- Writing to a file
+local file = io.open("test.txt", "w")
+file:write("Hello, Lua!")
+file:close()
+
+-- Reading from a file
+local file = io.open("test.txt", "r")
+local content = file:read("*a")
+print(content)  -- Outputs: Hello, Lua!
+file:close()
+```
+
+### Full Lua Example: Simple To-Do List
+
+Here’s a more complete example demonstrating many Lua concepts together.
+
+```lua
+-- Define a simple To-Do List class
+ToDoList = {}
+ToDoList.__index = ToDoList
+
+function ToDoList:new()
+    local instance = {
+        tasks = {}
+    }
+    setmetatable(instance, ToDoList)
+    return instance
+end
+
+-- Add a task
+function ToDoList:add(task)
+    table.insert(self.tasks, task)
+end
+
+-- Remove a task
+function ToDoList:remove(task)
+    for i, v in ipairs(self.tasks) do
+        if v == task then
+            table.remove(self.tasks, i)
+            return
+        end
+    end
+end
+
+-- Display all tasks
+function ToDoList:display()
+    print("To-Do List:")
+    for i, v in ipairs(self.tasks) do
+        print(i .. ". " .. v)
+    end
+end
+
+-- Create an instance and use it
+local myList = ToDoList:new()
+myList:add("Learn Lua")
+myList:add("Build a project")
+myList:display()
+
+-- Remove a task
+myList:remove("Learn Lua")
+myList:display()
+
+-- Outputs:
+-- To-Do List:
+-- 1. Learn Lua
+-- 2. Build a project
+-- To-Do List:
+-- 1. Build a project
+```
+
+In this full example, we’ve combined OOP-style metatables, table manipulation, and function definitions to build a basic to-do list manager. You can add and remove tasks, and the list will update accordingly.
+
+### Conclusion
+
+Lua's simplicity, speed, and flexibility have earned it a special place in industries ranging from game development to IoT. Its ability to be embedded in larger applications, coupled with its easy-to-learn syntax, makes Lua an attractive choice for both new and experienced programmers.
+
+For those looking to start working with Lua, the official documentation at Lua.org is a great resource for further reading.

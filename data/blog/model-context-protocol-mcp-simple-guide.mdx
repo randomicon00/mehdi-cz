@@ -1,0 +1,168 @@
+---
+title: "Model Context Protocol (MCP): A Friendly Guide in Simple English"
+date: "2025-09-17"
+tags: ["ai", "mcp", "integrations", "protocol"]
+draft: false
+summary: "What MCP is, why it matters, and how it works—explained with clear language and real examples."
+---
+
+## What we’ll cover
+
+- What MCP is, in plain words
+- The 3 basic parts: tools, resources, prompts
+- How it works, step by step
+- Simple examples you can picture
+- Why teams use it
+- Safety tips and common mistakes
+- How to start (lightweight)
+- A short FAQ
+
+## MCP in one sentence
+
+Model Context Protocol (MCP) is a common way to connect an AI assistant to your real data and tools, so the AI can read the right information and do useful actions—with your approval.
+
+## Think of MCP like a power adapter
+
+Your AI is a device. Your company has many “sockets”: Google Drive, GitHub, Slack, a database, an internal API. Without an adapter, your device can’t plug in. MCP is the adapter. It lets the AI plug into many different “sockets” safely and in a standard way, instead of building a new custom wire for every system.
+
+## Two main roles
+
+- MCP server: “Exposes” things to the AI. It offers tools (actions), resources (readable data), and prompts (reusable templates).
+- MCP client (or host): The AI app that connects to those servers. It could be a desktop AI app or your own software that talks to an LLM.
+
+You can run one server (simple) or many servers (for different systems). The client connects to them as needed.
+
+## The 3 building blocks
+
+### 1) Tools (do something)
+
+Tools are actions AI can run. Examples:
+
+- create_github_issue(repo, title, body)
+- send_slack_message(channel, text)
+- query_database(sql)
+- get_weather(lat, lon)
+
+AI can choose a tool when it needs to act. You usually approve the call before it runs. The tool returns a result (e.g., “issue #123 created”).
+
+### 2) Resources (read something)
+
+Resources are like files or URLs of data the AI can read. Examples:
+
+- /docs/design.md
+- /db/sales/last_7_days
+- /api/users/42
+
+The AI reads resources to get accurate, up‑to‑date context.
+
+### 3) Prompts (reusable templates)
+
+Prompts are pre‑written helpers you can reuse. Think of them like “stationery” for your AI. Examples:
+
+- bug_report_prompt(title, logs)
+- summarize_document(style="non-technical")
+
+Prompts make repeated tasks simple and consistent.
+
+## How it works (simple flow)
+
+1. You ask the AI: “Please file a bug for this crash and post it to our team channel.”
+2. The client (AI app) looks at connected MCP servers. It sees tools like create_issue and post_to_slack.
+3. The AI plans: call create_issue with a title/body, then call post_to_slack with the link.
+4. The client shows you the plan and asks for approval.
+5. The client calls the tools via the MCP server(s). The tools run and return results.
+6. The AI replies with a clean message and links to the new issue and Slack post.
+
+Everything uses a standard protocol, so it’s reliable and reusable across apps.
+
+## Clear examples
+
+### Example A: Weather helper
+
+- Tools:
+  - get_alerts(state_code)
+  - get_forecast(lat, lon)
+- Ask: “Is it safe to travel in Texas today?”
+- The AI calls get_alerts("TX"), reads the results, and explains them in plain words. If you ask for local forecast, it calls get_forecast and includes details like temperature and wind.
+
+### Example B: Engineering helper
+
+- Tools:
+  - create_github_issue(repo, title, body)
+  - add_label(repo, issue_number, label)
+  - list_recent_failures(ci_service)
+- Resources:
+  - /docs/oncall_guide.md
+  - /service/api/errors_last_24h
+- Ask: “Open a bug for the failing tests in service X, label it ‘CI’, and show me the last 10 failures.”
+- The AI reads the resource to understand context, creates the issue, adds the label, and returns a short report.
+
+### Example C: Support assistant
+
+- Tools:
+  - find_customer(email)
+  - refund_order(order_id, amount)
+  - create_ticket(summary, details)
+- Resources:
+  - /policies/refund.md
+  - /kb/common_issues.json
+- The AI can follow policy, ask for approval, and do only allowed steps.
+
+## Why teams use MCP
+
+- Standard, not custom glue: Avoid one‑off connectors for each tool.
+- Safer operations: The AI uses defined tools with approvals. Permissions and logs are clearer.
+- Better answers: The AI can read the right resource and use the right tool at the right time.
+- Easier maintenance: Update a tool or swap a server; the client still understands the protocol.
+
+## Safety and good habits
+
+- Ask for approval: Always confirm tool calls for write/change actions.
+- Don’t leak secrets: Fetch secrets from a manager; don’t paste them into prompts.
+- Log responsibly: If the server uses stdio, log to stderr (not stdout) so you don’t break protocol messages.
+- Least privilege: Only expose the tools and resources people actually need.
+- Version and test tools: Treat tools like production code. Add basic tests and docs.
+
+## Common mistakes to avoid
+
+- One mega‑tool that does everything: Prefer many small tools. They’re easier to test and reason about.
+- No validation: Parse and validate inputs. Fail early with friendly errors.
+- Too many resources: Don’t dump your whole wiki. Offer key documents and listings.
+- Hidden side effects: Tools should say what they do and do what they say.
+
+## How to start (lightweight)
+
+1. Pick one tiny use case (weather, issue filing, or a simple DB query).
+2. Define 1–3 tools with clear names and simple inputs/outputs.
+3. Add one resource the AI can read (a short policy or small dataset).
+4. Connect your server to your AI app (the “client/host”).
+5. Try one real user flow end‑to‑end. Improve from feedback.
+
+You don’t need a big re‑architecture. Start small and expand.
+
+## Under the hood (still simple)
+
+- The client and server talk over a standard protocol (often JSON‑RPC).
+- The server announces what it can do (tools/resources/prompts).
+- The client shows those to the AI, which decides what to use.
+- The client executes tool calls, returns results, and the AI writes a friendly answer for you.
+
+You can run multiple servers too—one for GitHub, one for Slack, one for your database. The client can connect to all.
+
+## Quick FAQ
+
+**Is MCP only for one AI model?**  
+No. MCP is a protocol. Any AI app or model can use it if they follow the standard.
+
+**Do I need to expose everything I have?**  
+No. Start with a few safe tools and a couple of resources. Grow from there.
+
+**Can I control who can run which tools?**  
+Yes. Add access checks, approvals, and logging. Treat tools like APIs with permissions.
+
+**What about cost and performance?**  
+Keep tools small and focused. Cache where it makes sense. Measure calls and tune over time.
+
+## Final take
+
+MCP is a simple adapter that lets your AI use your real systems safely. You define small, clear tools and readable resources, and the AI becomes truly useful—able to look things up and take action with your guidance. Start with one tiny workflow, learn from it, and expand.

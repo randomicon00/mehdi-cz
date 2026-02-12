@@ -1,0 +1,153 @@
+---
+title: "Exploring Rust's macro_rules Through match_ast! Macro Examples"
+date: "2025-01-20"
+tags: ["rust", "macros", "macro_rules", "learning", "syntax"]
+draft: false
+summary: "A deep dive into Rust's macro_rules! by analyzing the match_ast! macro, providing practical examples and showcasing its powerful pattern matching capabilities for developers looking to master macros."
+---
+
+### Introduction to `macro_rules!` in Rust
+
+Macros in Rust are powerful tools that allow for metaprogramming, enabling developers to write code that writes other code. One of the most common types of macros in Rust is `macro_rules!`, which provides a way to define macros that match specific patterns and generate code accordingly.
+
+In this article, we'll explore how `macro_rules!` works by dissecting the `match_ast!` macro, used commonly in Rust projects like `rust-analyzer`. We will walk through the core components of `macro_rules!`, using the `match_ast!` macro as our case study. Our examples will illustrate how this macro can match syntax nodes against abstract syntax tree (AST) types, allowing us to simplify branching code and work effectively with complex structures.
+
+### Anatomy of the `match_ast!` Macro
+
+Let's start with the macro definition:
+
+```rust
+#[macro_export]
+macro_rules! match_ast {
+    (match $node:ident { $($tt:tt)* }) => { $crate::match_ast!(match ($node) { $($tt)* }) };
+
+    (match ($node:expr) {
+        $( $( $path:ident )::+ ($it:pat) => $res:expr, )*
+        _ => $catch_all:expr $(,)?
+    }) => {{
+        $( if let Some($it) = $($path::)+cast($node.clone()) { $res } else )*
+        { $catch_all }
+    }};
+}
+```
+
+This macro aims to match a given syntax node (`$node`) against multiple possible AST types. The use of `macro_rules!` here lets us break down complex type matching and simplify our logic.
+
+### How `match_ast!` Works
+
+To understand how `match_ast!` works, we'll explore two different examples where this macro is used. These examples illustrate how the macro simplifies type-checking different syntax node types and executing different code paths accordingly.
+
+#### Example 1: Matching Functions and Closures
+
+Consider this piece of code that uses `match_ast!`:
+
+```rust
+let body = match_ast! {
+    match parent {
+        ast::Fn(func) => func.body()?,
+        ast::ClosureExpr(closure) => match closure.body()? {
+            Expr::BlockExpr(block) => block,
+            // Closures require a block when a return type is specified
+            _ => return None,
+        },
+        _ => return None,
+    }
+};
+```
+
+In this example, the `match_ast!` macro is used to match the type of the `parent` syntax node. It helps us identify whether the node is an AST function (`ast::Fn`) or a closure (`ast::ClosureExpr`). The macro allows for concise branching logic:
+
+- If `parent` is a function (`ast::Fn`), we extract its body using `func.body()?`.
+- If `parent` is a closure (`ast::ClosureExpr`), we further match on its body, checking whether it is a `BlockExpr` or another expression type.
+
+Here is how it expands. But I suggested, you try it out yourself first, as an exercise.
+
+```rust
+if let Some(func) = ast::Fn::cast(parent.clone()) {
+    func.body()?
+} else if let Some(closure) = ast::ClosureExpr::cast(parent.clone()) {
+    match closure.body()? {
+        Expr::BlockExpr(block) => block,
+        _ => return None,
+    }
+} else {
+    return None;
+}
+```
+
+The use of `match_ast!` here helps reduce boilerplate code associated with manually matching each type and casting the node, making the code easier to read and maintain.
+
+#### Example 2: Matching Path Segments
+
+Now, let’s look at a more complex example:
+
+```rust
+let def = match_ast! {
+    match parent {
+        ast::PathSegment(ps) => {
+            let res = sema.resolve_path(&ps.parent_path())?;
+            let generic_def: hir::GenericDef = match res {
+                hir::PathResolution::Def(hir::ModuleDef::Adt(it)) => it.into(),
+                hir::PathResolution::Def(hir::ModuleDef::Function(it)) => it.into(),
+                hir::PathResolution::Def(hir::ModuleDef::Trait(it)) => it.into(),
+                hir::PathResolution::Def(hir::ModuleDef::TraitAlias(it)) => it.into(),
+                hir::PathResolution::Def(hir::ModuleDef::TypeAlias(it)) => it.into(),
+                hir::PathResolution::Def(hir::ModuleDef::Variant(it)) => {
+                    variant = Some(it);
+                    it.parent_enum(sema.db).into()
+                },
+                hir::PathResolution::Def(hir::ModuleDef::BuiltinType(_))
+                | hir::PathResolution::Def(hir::ModuleDef::Const(_))
+                | hir::PathResolution::Def(hir::ModuleDef::Macro(_))
+                | hir::PathResolution::Def(hir::ModuleDef::Module(_))
+                | hir::PathResolution::Def(hir::ModuleDef::Static(_)) => return None,
+                hir::PathResolution::BuiltinAttr(_)
+                | hir::PathResolution::ToolModule(_)
+                | hir::PathResolution::Local(_)
+                | hir::PathResolution::TypeParam(_)
+                | hir::PathResolution::ConstParam(_)
+                | hir::PathResolution::SelfType(_)
+                | hir::PathResolution::DeriveHelper(_) => return None,
+            };
+
+            generic_def
+        },
+        ast::AssocTypeArg(_) => {
+            // FIXME: We don't record the resolutions for this anywhere atm
+            return None;
+        },
+        ast::MethodCallExpr(mcall) => {
+            // recv.method::<$0>()
+            let method = sema.resolve_method_call(&mcall)?;
+            method.into()
+        },
+        _ => return None,
+    }
+};
+```
+
+Here, `match_ast!` is used to match against various possible AST types for the `parent` node:
+
+- If `parent` is an `ast::PathSegment`, the code attempts to resolve the path and process its type using `hir::PathResolution`.
+- It handles various other cases such as `ast::AssocTypeArg` and `ast::MethodCallExpr`.
+
+Without `match_ast!`, each branch would require multiple lines of boilerplate code to perform type casting and handle different AST types individually. By using `match_ast!`, the code remains succinct and readable.
+
+### Understanding `macro_rules!` in `match_ast!`
+
+The `match_ast!` macro definition makes use of pattern matching to identify how to expand the macro based on the provided input:
+
+1. **Initial Expansion**:
+
+   - The first pattern matches the syntax: `(match $node:ident { $($tt:tt)* })`. This means we can use `match_ast!` with `match parent { ... }`. It converts this call into a form that uses `$crate::match_ast!`. This avoids code repetition and ensures consistency.
+
+2. **Branch Matching**:
+   - The second pattern matches: `match ($node:expr) { ... }`. Here, it processes each branch in the input.
+   - The line `$( if let Some($it) = $($path::)+cast($node.clone()) { $res } else )*` is crucial. It tries to match the node with each AST type (`$path`) and evaluates the corresponding expression (`$res`).
+   - Finally, if none of the matches succeed, the `_ => $catch_all` pattern is used as a fallback.
+
+This is not a recursive call in the usual sense where a function calls itself. Instead, the macro uses pattern expansion to repeatedly apply the matching logic for each provided branch.
+
+### Last Words
+
+`match_ast!` demonstrates the power of `macro_rules!` to reduce boilerplate and manage branching logic cleanly. By expanding to if let statements, it simplifies handling multiple AST types. Practice expanding macros like this yourself to gain a deeper understanding of Rust's metaprogramming tools.

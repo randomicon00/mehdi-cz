@@ -1,0 +1,33 @@
+---
+title: "Today I Learned: Counting Lines of Code in a Project with Neovim"
+date: "2024-11-28"
+tags: ["Neovim", "Command Line", "Productivity", "Coding Tips"]
+draft: false
+summary: Learn how to quickly calculate lines of code in a project using simple shell commands in Neovim, saving time and staying organized within your code editor.
+---
+
+Today, I wanted to get a quick count of lines of code (LOC) in a large project I’m working on. If you’re using Neovim like I am, there's a straightforward way to do this without leaving the editor. The trick combines the find and wc (word count) commands, run directly from Neovim.
+
+Here’s how:
+
+### The Command
+
+```bash
+find . -name '*.ext' -type f | xargs wc -l
+```
+
+#### Explanation:
+
+- `find . -name '*.ext' -type f`: This part of the command recursively searches through the current directory (`.`) for files that match a specific extension, like `*.js` for JavaScript files. Replace `*.ext` with the file extension of your choice. If you want to include all files, use ``*`.
+
+- `xargs wc -l`: The `xargs` command takes the output from `find` and applies the `wc -l` command to each file. `wc -l` counts the number of lines in each file and then provides a total.
+
+### Running in Neovim
+
+To run this directly in Neovim, open the command mode by typing : and add an exclamation mark ! to run shell commands:
+
+```bash
+:!find . -name '*.ext' -type f | xargs wc -l
+```
+
+This outputs the line count directly in Neovim, keeping everything in one place.

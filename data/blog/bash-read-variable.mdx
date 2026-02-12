@@ -1,0 +1,16 @@
+---
+title: "Today I Learnt: Read user input in bash"
+date: "2025-09-16"
+tags: ["bash", "til"]
+draft: false
+summary: "Prompt and read input into a variable with read."
+---
+
+Prompt and capture user input:
+
+```bash
+read -p "Your name: " name
+echo "Hello, $name"
+```
+
+Tip: use `-r` to avoid backslash escapes and `-s` for silent (password) input.

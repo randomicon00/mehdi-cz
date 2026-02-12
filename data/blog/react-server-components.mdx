@@ -1,0 +1,557 @@
+---
+title: "Today I Learnt: React Server Components"
+date: "2025-09-15"
+tags: ["react", "server-components", "next.js", "performance", "til"]
+draft: false
+summary: "Exploring React Server Components - a revolutionary approach to building React applications that run on the server, enabling better performance, SEO, and developer experience."
+---
+
+# Today I Learnt: React Server Components
+
+React Server Components (RSC) represent a paradigm shift in how we build React applications. Introduced by the React team, they allow components to run on the server, enabling better performance, improved SEO, and a more efficient development experience.
+
+## What are Server Components?
+
+Server Components are React components that run on the server instead of the client. They can:
+
+- Access server-side resources (databases, file systems, APIs)
+- Reduce bundle size by keeping server-only code on the server
+- Improve performance by reducing client-side JavaScript
+- Enable better SEO through server-side rendering
+
+```jsx
+// Server Component (runs on server)
+function ServerComponent() {
+  // This runs on the server
+  const data = fetchDataFromDatabase();
+
+  return (
+    <div>
+      <h1>Server Data: {data.title}</h1>
+      <ClientComponent data={data} />
+    </div>
+  );
+}
+
+// Client Component (runs on client)
+("use client");
+
+function ClientComponent({ data }) {
+  const [count, setCount] = useState(0);
+
+  return (
+    <div>
+      <p>Client interaction: {count}</p>
+      <button onClick={() => setCount(count + 1)}>Increment</button>
+      <p>Server data: {data.description}</p>
+    </div>
+  );
+}
+```
+
+## Key Concepts
+
+### Server vs Client Components
+
+```jsx
+// Server Component (default in app directory)
+function ServerProfile({ userId }) {
+  // ✅ Direct database access
+  const user = await db.user.findUnique({ where: { id: userId } });
+
+  // ✅ Use server-only libraries
+  const analytics = require('server-analytics');
+
+  // ❌ Cannot use client-side APIs
+  // const [state, setState] = useState();
+
+  return <UserProfile user={user} />;
+}
+
+// Client Component (marked with 'use client')
+'use client';
+
+function ClientProfile({ user }) {
+  // ✅ Can use client-side hooks and APIs
+  const [isEditing, setIsEditing] = useState(false);
+
+  // ✅ Can handle user interactions
+  const handleSave = () => {
+    // Client-side logic
+  };
+
+  return (
+    <div>
+      {isEditing ? (
+        <EditForm onSave={handleSave} />
+      ) : (
+        <UserDisplay user={user} onEdit={() => setIsEditing(true)} />
+      )}
+    </div>
+  );
+}
+```
+
+### Data Fetching Patterns
+
+```jsx
+// Server Component with data fetching
+async function BlogPost({ slug }) {
+  // ✅ Fetch data directly on server
+  const post = await fetchBlogPost(slug);
+  const comments = await fetchComments(post.id);
+
+  return (
+    <article>
+      <BlogHeader post={post} />
+      <BlogContent content={post.content} />
+      <Comments comments={comments} />
+    </article>
+  );
+}
+
+// Multiple data fetching strategies
+async function Dashboard() {
+  // Parallel data fetching
+  const [user, stats, notifications] = await Promise.all([
+    fetchUser(),
+    fetchUserStats(),
+    fetchNotifications(),
+  ]);
+
+  return (
+    <div>
+      <UserProfile user={user} />
+      <StatsDisplay stats={stats} />
+      <NotificationsList notifications={notifications} />
+    </div>
+  );
+}
+```
+
+## Advanced Patterns
+
+### Streaming and Suspense
+
+```jsx
+// Server Component with streaming
+function App() {
+  return (
+    <html>
+      <head>
+        <title>My App</title>
+      </head>
+      <body>
+        <Header />
+        <Suspense fallback={<Skeleton />}>
+          <SlowComponent />
+        </Suspense>
+        <Footer />
+      </body>
+    </html>
+  );
+}
+
+// Streaming different parts of the page
+function ProductPage({ productId }) {
+  return (
+    <div>
+      {/* Fast content loads immediately */}
+      <ProductHeader productId={productId} />
+
+      {/* Slower content streams in */}
+      <Suspense fallback={<ProductSkeleton />}>
+        <ProductDetails productId={productId} />
+      </Suspense>
+
+      <Suspense fallback={<ReviewsSkeleton />}>
+        <ProductReviews productId={productId} />
+      </Suspense>
+
+      {/* Recommendations load last */}
+      <Suspense fallback={<RecommendationsSkeleton />}>
+        <ProductRecommendations productId={productId} />
+      </Suspense>
+    </div>
+  );
+}
+```
+
+### Server Actions
+
+```jsx
+// Server Action (runs on server)
+'use server';
+
+async function createPost(formData: FormData) {
+  'use server';
+
+  const title = formData.get('title');
+  const content = formData.get('content');
+
+  // Server-side validation and database operations
+  const post = await db.post.create({
+    data: { title, content }
+  });
+
+  // Revalidate the page
+  revalidatePath('/posts');
+
+  return { success: true, post };
+}
+
+// Client Component using Server Action
+'use client';
+
+function CreatePostForm() {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (formData: FormData) => {
+    setIsSubmitting(true);
+    try {
+      const result = await createPost(formData);
+      if (result.success) {
+        // Handle success
+      }
+    } catch (error) {
+      // Handle error
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <form action={handleSubmit}>
+      <input name="title" placeholder="Post title" />
+      <textarea name="content" placeholder="Post content" />
+      <button type="submit" disabled={isSubmitting}>
+        {isSubmitting ? 'Creating...' : 'Create Post'}
+      </button>
+    </form>
+  );
+}
+```
+
+### Context and Providers
+
+```jsx
+// Server Context (available to all server components)
+function ServerLayout({ children }) {
+  // Server-side context
+  const theme = await getUserTheme();
+  const locale = await getUserLocale();
+
+  return (
+    <ThemeProvider theme={theme}>
+      <LocaleProvider locale={locale}>
+        {children}
+      </LocaleProvider>
+    </ThemeProvider>
+  );
+}
+
+// Client Context (for client-side state)
+'use client';
+
+function ClientProviders({ children }) {
+  const [userPreferences, setUserPreferences] = useState({});
+
+  return (
+    <UserPreferencesProvider
+      value={{ userPreferences, setUserPreferences }}
+    >
+      {children}
+    </UserPreferencesProvider>
+  );
+}
+```
+
+## Performance Benefits
+
+### Bundle Size Reduction
+
+```jsx
+// Before: All code in client bundle
+import { heavyLibrary } from "heavy-server-library"; // 500KB
+import { clientUtils } from "client-utils"; // 50KB
+
+function Component() {
+  // Both libraries in client bundle
+  return <div>...</div>;
+}
+
+// After: Server-only code stays on server
+// Server Component
+import { heavyLibrary } from "heavy-server-library"; // Stays on server
+
+function ServerComponent() {
+  const data = heavyLibrary.processData(); // Server-only
+  return <ClientComponent data={data} />;
+}
+
+// Client Component
+("use client");
+import { clientUtils } from "client-utils"; // Only client code
+
+function ClientComponent({ data }) {
+  // Only client utilities in bundle
+  return <div>{clientUtils.format(data)}</div>;
+}
+```
+
+### Improved Loading Performance
+
+```jsx
+// Progressive loading with Server Components
+function App() {
+  return (
+    <div>
+      {/* Immediate content */}
+      <Header />
+
+      {/* Fast server content */}
+      <Suspense fallback={<ContentSkeleton />}>
+        <ServerContent />
+      </Suspense>
+
+      {/* Interactive client content */}
+      <Suspense fallback={<InteractiveSkeleton />}>
+        <ClientInteractive />
+      </Suspense>
+
+      {/* Low priority content */}
+      <Suspense fallback={<FooterSkeleton />}>
+        <Footer />
+      </Suspense>
+    </div>
+  );
+}
+```
+
+## Best Practices
+
+### When to Use Server Components
+
+```jsx
+// ✅ Good for Server Components
+function BlogList() {
+  // Direct database access
+  const posts = await db.post.findMany();
+
+  // Heavy computations
+  const processedPosts = await processPosts(posts);
+
+  // Large libraries
+  const analytics = require('analytics-lib');
+
+  return <PostList posts={processedPosts} />;
+}
+
+// ✅ Good for Client Components
+function InteractiveForm() {
+  const [formData, setFormData] = useState({});
+  const [errors, setErrors] = useState({});
+
+  // User interactions
+  const handleSubmit = () => { /* ... */ };
+
+  // Browser APIs
+  const handleFileUpload = (file) => { /* ... */ };
+
+  return <Form onSubmit={handleSubmit} />;
+}
+```
+
+### Error Boundaries
+
+```jsx
+// Server Component error handling
+function ServerErrorBoundary({ children }) {
+  try {
+    return children;
+  } catch (error) {
+    // Log server error
+    console.error("Server component error:", error);
+
+    // Return fallback UI
+    return <ErrorFallback message="Something went wrong on the server" />;
+  }
+}
+
+// Client Component error boundary
+("use client");
+
+class ClientErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    // Log client error
+    console.error("Client component error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return <ErrorFallback message="Something went wrong" />;
+    }
+
+    return this.props.children;
+  }
+}
+```
+
+### Caching Strategies
+
+```jsx
+// Server Component with caching
+async function CachedDataComponent() {
+  // Cache for 5 minutes
+  const data = await unstable_cache(async () => fetchExpensiveData(), ["expensive-data"], {
+    revalidate: 300,
+  });
+
+  return <DataDisplay data={data} />;
+}
+
+// Request memoization
+async function MemoizedComponent() {
+  // Memoize across requests
+  const user = await unstable_cache(async () => getCurrentUser(), ["user"], { revalidate: 60 });
+
+  return <UserProfile user={user} />;
+}
+```
+
+## Migration Strategies
+
+### From Pages Router to App Router
+
+```jsx
+// Before: Pages Router (getServerSideProps)
+export default function Page({ data }) {
+  return <div>{data}</div>;
+}
+
+export async function getServerSideProps() {
+  const data = await fetchData();
+  return { props: { data } };
+}
+
+// After: App Router (Server Components)
+async function Page() {
+  const data = await fetchData();
+  return <div>{data}</div>;
+}
+```
+
+### Converting Client Components
+
+```jsx
+// Before: Heavy client component
+function HeavyComponent() {
+  const [data, setData] = useState(null);
+
+  useEffect(() => {
+    fetch("/api/data").then(setData);
+  }, []);
+
+  return <div>{data ? <DataDisplay data={data} /> : <Loading />}</div>;
+}
+
+// After: Server + Client components
+async function ServerComponent() {
+  const data = await fetchData();
+  return <DataDisplay data={data} />;
+}
+
+("use client");
+function DataDisplay({ data }) {
+  // Only client-side interactions here
+  return <div>{/* Display logic */}</div>;
+}
+```
+
+## Common Patterns and Anti-Patterns
+
+### ✅ Good Patterns
+
+```jsx
+// Pattern 1: Server for data, Client for interaction
+async function ProductList() {
+  const products = await fetchProducts();
+  return <ProductGrid products={products} />;
+}
+
+("use client");
+function ProductGrid({ products }) {
+  const [selected, setSelected] = useState(null);
+  // Client-side selection logic
+}
+
+// Pattern 2: Server Actions for mutations
+("use server");
+async function updateUser(formData) {
+  const data = Object.fromEntries(formData);
+  await db.user.update({ where: { id: data.id }, data });
+  revalidatePath("/users");
+}
+```
+
+### ❌ Anti-Patterns
+
+```jsx
+// Anti-pattern: Client component doing server work
+"use client";
+function BadComponent() {
+  const [data, setData] = useState(null);
+
+  useEffect(() => {
+    // ❌ Don't do this - use Server Component instead
+    fetch("/api/heavy-computation").then(setData);
+  }, []);
+
+  return <div>{data}</div>;
+}
+
+// Anti-pattern: Server component with client hooks
+function BadServerComponent() {
+  // ❌ Server components can't use client hooks
+  const [count, setCount] = useState(0);
+
+  return <div>{count}</div>;
+}
+```
+
+## Debugging Server Components
+
+```jsx
+// Debug server component execution
+function DebugServerComponent() {
+  console.log('🖥️  Running on server');
+
+  const data = await fetchData();
+  console.log('📊 Data fetched:', data);
+
+  return (
+    <div>
+      <DebugInfo data={data} />
+    </div>
+  );
+}
+
+// Client-side debugging
+'use client';
+function DebugInfo({ data }) {
+  console.log('🖥️  Running on client with data:', data);
+
+  return <div>Debug: {JSON.stringify(data)}</div>;
+}
+```
+
+React Server Components fundamentally change how we think about building React applications. They enable better performance, improved developer experience, and more efficient architecture by leveraging the server's capabilities while maintaining the interactive nature of client components.

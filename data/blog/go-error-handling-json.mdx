@@ -1,0 +1,25 @@
+---
+title: "Go API Errors: Friendly JSON Responses"
+date: "2025-09-17"
+tags: ["go", "api", "errors"]
+draft: false
+summary: "Return clear JSON errors with code and message. Help clients fix calls fast."
+---
+
+Good errors save time.
+
+## Code (short)
+
+```go
+func writeErr(w http.ResponseWriter, code int, msg string) {
+  w.Header().Set("Content-Type", "application/json")
+  w.WriteHeader(code)
+  json.NewEncoder(w).Encode(map[string]any{"error": msg})
+}
+```
+
+## Tips
+
+- Use standard codes (400, 401, 404, 500)
+- Include a trace id if you have one
+- Keep messages simple

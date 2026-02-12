@@ -1,0 +1,50 @@
+---
+title: "Understanding the export = Syntax in TypeScript"
+date: "2024-12-28"
+tags: ["typescript", "module system", "exports"]
+draft: false
+summary: "A quick guide to understanding the export = syntax in TypeScript, commonly used in compatibility scenarios with CommonJS modules."
+---
+
+The `export =` syntax is used in TypeScript when you're working with CommonJS or legacy modules that export a single object, function, or class. This syntax allows for compatibility with non-ES module systems where a single value is exported.
+
+### Example 1: Exporting a function
+
+```typescript
+function myFunction() {
+  console.log("Hello, TypeScript!");
+}
+
+export = myFunction;
+```
+
+Here, `myFunction` is the main export, and using `export =` allows it to be imported like this in CommonJS:
+
+```typescript
+const myFunction = require("./myModule");
+myFunction(); // Hello, TypeScript!
+```
+
+### Example 2: Exporting an object
+
+```typescript
+const myObject = {
+  name: "TypeScript",
+  version: "4.0",
+};
+
+export = myObject;
+```
+
+This object can now be imported using:
+
+```typescript
+const myObject = require("./myModule");
+console.log(myObject.name); // TypeScript
+```
+
+The `export = syntax` is mostly used for compatibility with modules that use `module.exports` in Node.js. For ES6 modules, prefer `export default` or named exports instead.
+
+### Why Wouldn't We Simply Use `module.exports`?
+
+You don't just use `module.exports` because TypeScript uses ES module syntax by default. `export =` bridges the gap between TypeScript’s ES module system and CommonJS modules (`module.exports`). Without it, TypeScript wouldn’t know how to handle `module.exports` correctly when working with TypeScript’s module system.

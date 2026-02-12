@@ -1,0 +1,139 @@
+---
+title: "Today I Learnt: Python Structural Pattern Matching"
+date: "2025-09-15"
+tags: ["python", "pattern-matching", "modern-python", "til"]
+draft: false
+summary: "Exploring Python 3.10's powerful structural pattern matching feature that brings functional programming patterns to Python with elegant syntax and powerful matching capabilities."
+---
+
+# Today I Learnt: Python Structural Pattern Matching
+
+Python 3.10 introduced structural pattern matching with the `match` statement, bringing powerful functional programming patterns to Python. This feature allows for elegant and readable code when dealing with complex conditional logic.
+
+## The Basics
+
+```python
+def process_data(data):
+    match data:
+        case {"type": "user", "name": name, "age": age}:
+            return f"User {name} is {age} years old"
+        case {"type": "product", "name": name, "price": price}:
+            return f"Product {name} costs ${price}"
+        case _:
+            return "Unknown data type"
+```
+
+## Advanced Patterns
+
+### Value Patterns
+
+```python
+def classify_number(n):
+    match n:
+        case 0:
+            return "zero"
+        case 1 | 2 | 3:
+            return "small number"
+        case x if x < 0:
+            return "negative"
+        case x if x % 2 == 0:
+            return "even"
+        case _:
+            return "odd positive"
+```
+
+### Sequence Patterns
+
+```python
+def analyze_list(items):
+    match items:
+        case []:
+            return "Empty list"
+        case [x]:
+            return f"Single item: {x}"
+        case [x, y]:
+            return f"Two items: {x}, {y}"
+        case [x, *rest]:
+            return f"First: {x}, others: {rest}"
+        case _:
+            return f"List with {len(items)} items"
+```
+
+### Class Patterns
+
+```python
+from dataclasses import dataclass
+
+@dataclass
+class Point:
+    x: int
+    y: int
+
+@dataclass
+class Circle:
+    center: Point
+    radius: int
+
+def describe_shape(shape):
+    match shape:
+        case Point(x=0, y=0):
+            return "Origin point"
+        case Point(x=x, y=y):
+            return f"Point at ({x}, {y})"
+        case Circle(center=Point(x=0, y=0), radius=r):
+            return f"Circle centered at origin with radius {r}"
+        case Circle(center=center, radius=radius):
+            return f"Circle with radius {radius}"
+```
+
+## Real-World Use Cases
+
+### HTTP Request Handler
+
+```python
+def handle_request(request):
+    match request:
+        case {"method": "GET", "path": "/users", "query": {"id": user_id}}:
+            return get_user(user_id)
+        case {"method": "POST", "path": "/users", "body": user_data}:
+            return create_user(user_data)
+        case {"method": "PUT", "path": path, "body": data} if path.startswith("/users/"):
+            user_id = path.split("/")[-1]
+            return update_user(user_id, data)
+        case {"method": method, "path": path}:
+            return {"error": f"Unsupported {method} {path}"}
+```
+
+### Configuration Parser
+
+```python
+def parse_config(config):
+    match config:
+        case {"database": {"type": "postgres", "host": host, "port": port}}:
+            return PostgresConnection(host, port)
+        case {"database": {"type": "mysql", "host": host, "port": port}}:
+            return MySQLConnection(host, port)
+        case {"cache": {"type": "redis", "host": host, "ttl": ttl}}:
+            return RedisCache(host, ttl)
+        case {"cache": {"type": "memory"}}:
+            return InMemoryCache()
+        case _:
+            raise ValueError("Invalid configuration")
+```
+
+## Benefits
+
+1. **Readability**: Complex conditional logic becomes more readable
+2. **Maintainability**: Easier to add new cases without breaking existing code
+3. **Type Safety**: Better exhaustiveness checking
+4. **Performance**: Can be optimized by the Python interpreter
+5. **Functional Programming**: Brings FP patterns to Python
+
+## Gotchas
+
+- Pattern matching is based on structure, not inheritance
+- Order matters: more specific patterns should come before general ones
+- Use `case _:` for default cases to avoid NonExhaustiveMatchError
+- Guards (`if` conditions) can make patterns more specific
+
+Pattern matching is a game-changer for Python developers, making code more expressive and maintainable. It's particularly powerful when dealing with complex data structures and conditional logic.

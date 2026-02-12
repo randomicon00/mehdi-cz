@@ -1,0 +1,8 @@
+.git
+node_modules
+.next/cache
+.next
+out
+.contentlayer
+.env
+.env.*

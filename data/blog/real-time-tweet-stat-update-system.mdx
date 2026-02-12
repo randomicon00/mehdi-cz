@@ -1,0 +1,154 @@
+---
+title: "Building a Real-Time Tweet Stats Update System: A Scalable Approach"
+date: "2025-02-01"
+tags:
+  [
+    "real-time updates",
+    "scalability",
+    "distributed systems",
+    "backend development",
+    "Redis",
+    "databases",
+  ]
+draft: false
+summary: "Explore how to design a real-time, scalable tweet stats update system, covering various approaches from basic direct updates to advanced sharded counters with real-time aggregation."
+---
+
+In a high-traffic platform like MyTweet (our fictitious Twitter-like service), maintaining up-to-date statistics on tweets—such as views, retweets, and likes—poses a significant technical challenge. This article takes you through designing a scalable system for real-time tweet statistics updates, starting from a basic solution and advancing to a sharded, distributed approach.
+
+### 1. Basic Approach: Direct Database Updates
+
+In the simplest implementation, each stat update (like a view, retweet, or like) directly writes to the database.
+
+When a user views, retweets, or likes a tweet, the system makes a direct call to the database to increment the count in a tweet_stats table.
+Table Structure:
+
+```sql
+CREATE TABLE tweet_stats (
+    tweet_id BIGINT PRIMARY KEY,
+    views BIGINT DEFAULT 0,
+    retweets BIGINT DEFAULT 0,
+    likes BIGINT DEFAULT 0
+);
+```
+
+#### Pros:
+
+- Simplicity: Straightforward to implement.
+- Immediate Consistency: Counts are immediately accurate as each action triggers a write.
+
+#### Cons:
+
+- Scalability Issues: High-traffic tweets can lead to an excessive number of database writes, overwhelming the database.
+- Performance Bottleneck: With each interaction causing a write, a spike in activity can overload the system.
+- Costly for High Write Volumes: Directly storing every interaction results in high database costs.
+
+### 2. Intermediate Solution: Batched Updates with In-Memory Caching
+
+To address the high write frequency, we can introduce an in-memory cache and periodic batched updates.
+
+Incoming stats updates are stored in a high-speed in-memory store (like Redis).
+Each interaction updates a counter in Redis, which is periodically flushed to the database.
+How It Works:
+
+Increment in Cache: Each interaction updates Redis:
+
+```bash
+HINCRBY tweet:123 views 1
+```
+
+Batch Write to Database: A background worker periodically consolidates Redis counts and writes them to the database, resulting in numbers that update in jumps (e.g., 100, 303, 450, etc.).
+
+#### Pros:
+
+- Reduced Database Load: Fewer writes to the database.
+- Higher Performance: Redis is optimized for frequent updates.
+
+#### Cons:
+
+- Eventual Consistency: Stats may not be immediately accurate as they’re updated in batches.
+- Potential Data Loss: Redis is volatile, so recent updates could be lost if the cache fails before the next batch write.
+
+### 3. Advanced Solution: Distributed Counter System with Sharded Aggregation
+
+For large-scale systems, a sharded, distributed counter system with real-time aggregation can handle the load efficiently.
+
+In this solution:
+
+- Sharded Counters: Counts are distributed across multiple Redis nodes to avoid bottlenecks.
+- Real-Time Aggregation: Counts are aggregated on-demand or in regular intervals, ensuring up-to-date stats while distributing the load.
+  Architecture Overview:
+
+#### Sharded Counters in Redis:
+
+Each tweet’s stats are divided across multiple shards in Redis (e.g., views:123:shard1, views:123:shard2).
+Incoming interactions are directed to random shards, distributing the load.
+
+#### Aggregation Service:
+
+A dedicated service aggregates counts from each shard to provide the latest stats.
+This service can either cache totals or retrieve them on demand.
+
+#### Periodic Database Writes:
+
+A background worker consolidates all shards periodically and writes a final total to the database, ensuring data durability.
+
+#### Data Flow:
+
+- Write Operation: Each interaction is routed to a Redis shard, balancing load across the system.
+- Real-Time Retrieval: The Aggregation Service fetches counts from each shard and sums them for real-time stats.
+- Batch Consolidation: Regular intervals of writes to the database persist the counts for analytics and backup.
+
+#### Pros:
+
+- High Scalability: Sharding prevents overload on a single node, managing spikes effectively.
+- Real-Time Stats: The Aggregation Service allows near-instant access to accurate stats.
+- Durability: Scheduled database writes prevent data loss, ensuring stats persist over time.
+
+#### Cons:
+
+- Complex System: More components and sharding management add complexity.
+- Increased Infrastructure Cost: Sharded counters and aggregation require more resources.
+
+### Example Redis Shard Structure
+
+To increment view count for tweet 123:
+
+```bash
+HINCRBY views:123:shard1 count 1
+HINCRBY views:123:shard2 count 1
+```
+
+When retrieving totals, the Aggregation Service sums up views:123:shard1, views:123:shard2, etc.
+
+Aggregation Service Pseudocode
+
+```go
+func GetTweetStats(tweetID string) (Stats, error) {
+    viewCount := SumRedisShards("views:" + tweetID)
+    likeCount := SumRedisShards("likes:" + tweetID)
+    retweetCount := SumRedisShards("retweets:" + tweetID)
+
+    return Stats{Views: viewCount, Likes: likeCount, Retweets: retweetCount}, nil
+}
+```
+
+Background Worker Pseudocode
+
+```go
+func ConsolidateStats() {
+    for each tweetID in Redis {
+        viewCount := SumRedisShards("views:" + tweetID)
+        likeCount := SumRedisShards("likes:" + tweetID)
+        retweetCount := SumRedisShards("retweets:" + tweetID)
+
+        SaveToDatabase(tweetID, viewCount, likeCount, retweetCount)
+    }
+}
+```
+
+### Conclusion
+
+Handling real-time tweet stats updates in a scalable, reliable way involves trade-offs between immediate accuracy and system load. By moving from direct database updates to a sharded, distributed approach, MyTweet could handle even the most extreme traffic while keeping stats accurate, consistent, and fast.
+
+Through this approach, stats like views, retweets, and likes can update in real-time without overloading the system, allowing MyTweet to support high engagement smoothly—even during major events.

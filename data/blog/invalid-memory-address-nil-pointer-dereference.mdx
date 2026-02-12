@@ -1,0 +1,40 @@
+---
+title: "Understanding 'Invalid Memory Address or Nil Pointer Dereference' in Go"
+date: "2025-01-17"
+tags: ["golang", "error handling", "nil pointer", "segmentation fault"]
+draft: false
+summary: A concise guide to understanding and resolving the 'invalid memory address or nil pointer dereference' error in Go, covering common causes and practical solutions.
+---
+
+The `invalid memory address or nil pointer dereference` error in Go signals an attempt to access uninitialized (`nil`) memory, often resulting in a segmentation fault. This typically occurs when using pointers, structs, or interfaces that haven’t been properly initialized.
+
+### Common Causes
+
+1. **Uninitialized Pointers**: Using a pointer to a struct without memory allocation.
+2. **Nil Interfaces**: Passing a `nil` interface or method on an uninitialized interface.
+3. **Uninitialized Dependencies**: Missing initialization for dependencies like database clients.
+
+### Example
+
+n this example, accessing `db.Connection` causes an error because db is `nil`:
+
+```go
+type Database struct { Connection string }
+
+func main() {
+    var db *Database // db is nil
+    fmt.Println(db.Connection) // causes nil pointer dereference
+}
+```
+
+### Solutions
+
+- Check for `nil` before accessing a pointer:
+
+```go
+if db != nil { fmt.Println(db.Connection) }
+```
+
+- **Proper Initialization**: Use `&Database{}` or `new(Database)` to ensure memory is allocated.
+
+Following these practices reduces the likelihood of encountering `nil` pointer errors in Go, keeping your code more stable and predictable.

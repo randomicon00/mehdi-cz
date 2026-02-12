@@ -1,0 +1,132 @@
+---
+title: "Understanding module.exports and CommonJS Export/Import"
+date: "2024-11-01"
+tags: ["javascript", "commonjs", "module.exports", "exports", "nodejs"]
+draft: false
+summary: This article explains the nuances of `module.exports` and `exports` in CommonJS, including common pitfalls when using exports, how to handle function vs object exports, and awkward scenarios that developers often encounter.
+---
+
+In CommonJS, there are a few scenarios where exports can feel awkward, particularly when you're dealing with the distinction between `module.exports` and `exports`, as well as differences in how these exports are consumed using `require`.
+
+Here are some common points of confusion:
+
+## module.exports vs exports
+
+- `module.exports` is the actual object that gets returned when a module is `require`d.
+- `exports` is just a reference to `module.exports`. You can think of it as a shorthand.
+
+```javascript
+// Both of these are equivalent initially:
+exports.hello = () => console.log("hello");
+module.exports.hello = () => console.log("hello");
+
+// But if you reassign `module.exports`, it breaks the connection:
+module.exports = () => console.log("new function");
+// Now `exports` no longer points to the same thing as `module.exports`
+```
+
+## Reassigning module.exports
+
+When you reassign `module.exports`, you replace the entire export object. This can create confusion, especially when you also use `exports` in the same file.
+
+```javascript
+// This exports an object:
+module.exports = {
+  hello: () => console.log("hello"),
+};
+
+// This overwrites the previous export with a function:
+module.exports = () => console.log("new function");
+
+// Trying to use `exports` here would cause confusion, because it's no longer connected to the exported value:
+exports.goodbye = () => console.log("goodbye"); // This doesn't affect the export at all.
+```
+
+In this case, `exports.goodbye` has no effect because `module.exports` has already been overwritten to be a function.
+
+## Exporting a Function vs an Object
+
+When you export a function directly, this can be awkward because you cannot easily add properties to it, unless
+you specifically modify the function itself.
+
+```javascript
+module.exports = () => console.log("hello world");
+
+// Now trying to add properties:
+module.exports.description = "This is awkward!"; // This won't work naturally with the function.
+```
+
+## require-ing an Exported Object vs a Function
+
+When importing a module that exports a function or an object, how you access the exported content depends on whether `module.exports` was an object or function.
+
+When exporting an object:
+
+```javascript
+// module.js
+module.exports = {
+  func: () => console.log("Function inside object"),
+  prop: "Some property",
+};
+
+// consumer.js
+const myModule = require("./module");
+myModule.func(); // Works fine
+console.log(myModule.prop); // 'Some property'
+```
+
+When exporting a function directly:
+
+```javascript
+// module.js
+module.exports = () => console.log("Direct function export");
+
+// consumer.js
+const myFunc = require("./module");
+myFunc(); // Works fine
+```
+
+However, if you try to treat this as an object in the consumer, it will throw an error since `module.exports`
+was assigned to a function:
+
+```javascript
+const myModule = require("./module");
+myModule.func(); // TypeError: myModule.func is not a function
+```
+
+## Handling Default and Named Exports in CommonJS (ES6-style syntax)
+
+In ES6 modules, you can have default exports and named exports, but CommonJS doesn't handle this as cleanly.
+You can simulate it by exporting an object where `default` holds the default export.
+
+```javascript
+// In CommonJS
+module.exports = {
+  default: () => console.log("This is the default export"),
+  namedExport: () => console.log("This is a named export"),
+};
+
+// Consumer (ES6-style simulation)
+const myModule = require("./module");
+myModule.default(); // "This is the default export"
+myModule.namedExport(); // "This is a named export"
+```
+
+Alternatively, to more easily mimic an ES6 default export:
+
+```javascript
+module.exports = () => console.log("Default export");
+module.exports.namedExport = () => console.log("Named export");
+
+// consumer
+const myModule = require("./module");
+myModule(); // Default export
+myModule.namedExport(); // Named export
+```
+
+## Last Words
+
+The awkwardness in CommonJS arises mainly when switching between exporting objects and functions, and
+managing the relationship between `exports` and `module.exports`. The most common mistake is expecting
+`exports` to work after reassigning `module.exports`, or trying to access an exported function as if it
+were an object.

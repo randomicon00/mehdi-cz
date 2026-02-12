@@ -1,0 +1,59 @@
+---
+title: "Rust Macros: An Introduction"
+date: "2025-01-29"
+tags: ["rust", "macros", "declarative", "procedural", "derive"]
+draft: false
+summary: Rust provides powerful macros that allow for metaprogramming, enabling developers to write code that generates other code.
+---
+
+Rust macros provide a powerful way to write code that generates other code, allowing for metaprogramming and more efficient development. There are three main types of macros in Rust: declarative macros, procedural macros, and derive macros.
+
+## Declarative Macros
+
+Also known as _macro_rules!_, declarative macros allow you to define patterns to match and generate code based on these patterns. They are often used to create repetitive or boilerplate code in a concise manner.
+
+```rust
+macro_rules! say_hello {
+  () => {
+    println!("Hello, world!");
+  };
+}
+
+fn main() {
+  say_hello!(); // Expands to println!("Hello, world!");
+}
+```
+
+## Procedural Macros
+
+These macros accept code as input and generate code as output. They are more flexible than declarative macros and are used to manipulate Rust’s Abstract Syntax Tree (AST). Procedural macros come in three types: function-like, attribute, and derive macros.
+
+**Function-like**: Used like a function but work at compile time.
+
+```
+#[proc_macro]
+pub fn my_macro(input: TokenStream) -> TokenStream {
+    // Generates code from input
+}
+```
+
+## Derive Macros
+
+Often used to implement traits for a struct or enum automatically. The most common example is `#[derive]`, which generates code for implementing common traits like `Debug` or `Clone`.
+
+```
+#[derive(Debug)]
+struct Person {
+  name: String,
+  age: u8,
+}
+
+fn main() {
+    let person = Person { name: "Alice".to_string(), age: 30 };
+    println!("{:?}", person); // Outputs: Person { name: "Alice", age: 30 }
+}
+```
+
+Rust macros are a powerful tool that make it easier to write less repetitive, more efficient
+code. Whether you're using them for simple patterns, auto-deriving traits, or advanced code
+generation, macros can save time and keep your codebase clean and maintainable.

@@ -1,0 +1,88 @@
+---
+title: "Why Use 'as unknown' in TypeScript Casts?"
+date: "2024-12-18"
+tags: ["typescript", "casting", "type safety", "type system"]
+draft: false
+summary: Learn why TypeScript developers sometimes cast to 'unknown' first, with examples showing when and why this approach is necessary.
+---
+
+### Why Use `as unknown` in TypeScript?
+
+When working with TypeScript, you may encounter situations where you see code like this:
+
+```typescript
+const value = someObject as unknown as TargetType;
+```
+
+While it might seem redundant, casting to `unknown` first is sometimes necessary to bypass TypeScript's strict type system. Let’s explore why.
+
+### The Issue with Direct Casting
+
+TypeScript enforces type safety by preventing direct casts between types that do not overlap sufficiently. For example:
+
+```typescript
+type NavigationProps<T> = {
+  title: string;
+  id: number;
+  payload: T;
+};
+
+type CustomProps<T> = {
+  title: number;
+  active: boolean;
+  payload: T;
+};
+
+const navValue: NavigationProps<boolean> = { title: "Page", id: 123, payload: true };
+
+// Direct cast will fail:
+const castValue = navValue as CustomProps<number>; // Error: Types of property 'title' are incompatible.
+```
+
+### Why `as unknown` Works
+
+Casting `navValue` to `unknown` first effectively bypasses TypeScript’s strict type checks, allowing the next cast to succeed:
+
+```typescript
+const safeCastValue = navValue as unknown as CustomProps<number>; // No TypeScript error
+```
+
+**Explanation**:
+
+- **`unknown`** overlaps with any type.
+- Casting to `unknown` signals to TypeScript: “Trust me, I know what I’m doing.” This allows the second cast to proceed without additional checks.
+
+### Practical Use Cases
+
+1. **Handling Complex or Legacy Code**: Sometimes, third-party libraries or legacy code return types that don’t align perfectly with expected types.
+2. **Escape Hatch**: When you need to bypass type restrictions in specific cases, such as working with dynamically generated types.
+
+### When to Avoid
+
+While `as unknown` can be useful, it should be used sparingly. Relying on it too much can make your code prone to runtime errors and harder to maintain. Always consider whether you can use type guards or more specific type definitions first.
+
+### Counter Example in Context
+
+Here’s an illustration with TypeScript’s type system enforcing strict checks:
+
+```typescript
+type OriginalType<T> = { name: string; value: T };
+type NewType<T> = { name: number; value: T };
+
+const obj: OriginalType<boolean> = { name: "example", value: true };
+
+// Direct cast results in an error:
+const converted = obj as NewType<number>;
+// Error: Conversion of type 'OriginalType<boolean>' to type 'NewType<number>' may be a mistake.
+
+// Casting to 'unknown' resolves this:
+const safeConverted = obj as unknown as NewType<number>; // No TypeScript error
+```
+
+### Conclusion
+
+- `as unknown` is a practical way to bypass TypeScript's strict type checks for type conversions.
+- It should be used sparingly to avoid potential runtime errors.
+- Always consider type guards or stricter type definitions before resorting to `as unknown`.
+- Use `as unknown` as an “escape hatch” when you’re confident the type conversion is safe.
+- Maintain readability and ensure code maintainability when using this technique.

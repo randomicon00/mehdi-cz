@@ -1,0 +1,18 @@
+---
+title: "Today I Learned: HTML Headers are Case-Insensitive"
+date: "2025-01-08"
+tags: ["HTML", "Web Development", "Coding Tips"]
+draft: false
+summary: A quick tip for web developers on the case insensitivity of HTML headers, a little-known but useful quirk in HTML standards that simplifies development.
+---
+
+Today I learned that HTTP header keys are **case-insensitive!** This means headers like `Content-Type` and `content-type` are treated the same way. While HTTP allows this flexibility, using lowercase consistently (like `content-type`) is a best practice. It keeps code predictable, readable, and works well with frameworks that default to lowercase.
+
+Here's a quick example:
+
+```bash
+curl -H "Content-Type: application/json" https://api.example.com
+curl -H "content-type: application/json" https://api.example.com
+```
+
+Both commands send the same `Content-Type` header, no matter the case.

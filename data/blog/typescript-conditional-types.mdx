@@ -1,0 +1,207 @@
+---
+title: "Today I Learnt: TypeScript Conditional Types"
+date: "2025-09-15"
+tags: ["typescript", "conditional-types", "advanced-types", "til"]
+draft: false
+summary: "Mastering TypeScript's conditional types - a powerful feature that enables type-level programming and creates types that depend on other types, opening up advanced type manipulation possibilities."
+---
+
+# Today I Learnt: TypeScript Conditional Types
+
+TypeScript's conditional types are one of the most powerful features for advanced type manipulation. They allow you to create types that depend on other types, enabling sophisticated type-level programming.
+
+## Basic Syntax
+
+```typescript
+type ConditionalType<T> = T extends string ? "text" : "other";
+```
+
+The syntax `T extends U ? X : Y` means: "If T is assignable to U, then use type X, otherwise use type Y".
+
+## Simple Examples
+
+```typescript
+type IsString<T> = T extends string ? true : false;
+
+type A = IsString<string>; // true
+type B = IsString<number>; // false
+type C = IsString<"hello">; // true
+```
+
+## Practical Use Cases
+
+### Function Overload Inference
+
+```typescript
+type ReturnTypeOf<T> = T extends (...args: any[]) => infer R ? R : never;
+
+function getUser() {
+  return { id: 1, name: "John" };
+}
+
+type User = ReturnTypeOf<typeof getUser>;
+// Equivalent to: { id: number, name: string }
+```
+
+### Array Type Checking
+
+```typescript
+type IsArray<T> = T extends (infer U)[] ? U : T;
+
+type ElementType1 = IsArray<string[]>; // string
+type ElementType2 = IsArray<number>; // number
+type ElementType3 = IsArray<[string, number]>; // string | number
+```
+
+### API Response Types
+
+```typescript
+interface ApiResponse<T> {
+  data: T;
+  status: number;
+  message: string;
+}
+
+type ExtractData<T> = T extends ApiResponse<infer U> ? U : never;
+
+type UserData = ExtractData<ApiResponse<{ id: number; name: string }>>;
+// Result: { id: number; name: string }
+```
+
+## Advanced Patterns
+
+### Nested Conditional Types
+
+```typescript
+type DeepFlatten<T> = T extends (infer U)[]
+  ? U extends (infer V)[]
+    ? V extends (infer W)[]
+      ? W
+      : V
+    : U
+  : T;
+
+type Result1 = DeepFlatten<string[][][]>; // string
+type Result2 = DeepFlatten<number[]>; // number
+type Result3 = DeepFlatten<string>; // string
+```
+
+### Union Distribution
+
+```typescript
+type ToArray<T> = T extends any ? T[] : never;
+
+type UnionToTuple = ToArray<string | number | boolean>;
+// Result: string[] | number[] | boolean[]
+```
+
+### Function Parameter Types
+
+```typescript
+type Parameters<T> = T extends (...args: infer P) => any ? P : never;
+
+function greet(name: string, age: number) {
+  return `Hello ${name}, you are ${age} years old`;
+}
+
+type GreetParams = Parameters<typeof greet>;
+// Result: [name: string, age: number]
+```
+
+## Real-World Applications
+
+### Database Query Builder
+
+```typescript
+type WhereClause<T> = {
+  [K in keyof T]?: T[K] | { $eq: T[K] } | { $ne: T[K] } | { $in: T[K][] };
+};
+
+interface User {
+  id: number;
+  name: string;
+  email: string;
+  role: "admin" | "user";
+}
+
+type UserQuery = WhereClause<User>;
+// Result: {
+//   id?: number | { $eq: number } | { $ne: number } | { $in: number[] };
+//   name?: string | { $eq: string } | { $ne: string } | { $in: string[] };
+//   email?: string | { $eq: string } | { $ne: string } | { $in: string[] };
+//   role?: 'admin' | 'user' | { $eq: 'admin' | 'user' } | ...
+// }
+```
+
+### Component Props Inference
+
+```typescript
+type ComponentProps<T> = T extends React.ComponentType<infer P> ? P : never;
+
+const MyComponent: React.FC<{ title: string; count: number }> = () => <div />;
+
+type MyComponentProps = ComponentProps<typeof MyComponent>;
+// Result: { title: string; count: number }
+```
+
+### API Client Types
+
+```typescript
+type HttpMethod = "GET" | "POST" | "PUT" | "DELETE";
+
+type EndpointConfig = {
+  "/users": { method: "GET"; response: User[] };
+  "/users/:id": { method: "GET"; response: User };
+  "/users": { method: "POST"; body: Omit<User, "id">; response: User };
+};
+
+type ExtractResponse<T extends { response: any }> = T["response"];
+type ExtractBody<T> = T extends { body: infer B } ? B : undefined;
+
+type ApiResponse<T extends keyof EndpointConfig> = ExtractResponse<EndpointConfig[T]>;
+type ApiBody<T extends keyof EndpointConfig> = ExtractBody<EndpointConfig[T]>;
+
+// Usage
+async function apiCall<T extends keyof EndpointConfig>(
+  endpoint: T,
+  body?: ApiBody<T>
+): Promise<ApiResponse<T>> {
+  // Implementation
+  return {} as any;
+}
+
+// Type-safe API calls
+const users = await apiCall("/users"); // User[]
+const user = await apiCall("/users/:id"); // User
+const newUser = await apiCall("/users", { name: "John" }); // User
+```
+
+## Best Practices
+
+1. **Use `infer` for Type Extraction**: The `infer` keyword allows you to extract types from conditional types
+2. **Combine with Template Literal Types**: Create dynamic types based on string patterns
+3. **Leverage Distribution**: Conditional types automatically distribute over unions
+4. **Keep it Simple**: Complex conditional types can become hard to read and maintain
+5. **Use Utility Types**: Combine conditional types with mapped types for powerful patterns
+
+## Common Patterns
+
+### NonNullable
+
+```typescript
+type NonNullable<T> = T extends null | undefined ? never : T;
+```
+
+### Extract
+
+```typescript
+type Extract<T, U> = T extends U ? T : never;
+```
+
+### Exclude
+
+```typescript
+type Exclude<T, U> = T extends U ? never : T;
+```
+
+Conditional types are a cornerstone of advanced TypeScript development, enabling type-level programming that was previously impossible. They allow you to create sophisticated type transformations and ensure type safety at compile time.

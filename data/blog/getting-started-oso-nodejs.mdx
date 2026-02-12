@@ -1,0 +1,36 @@
+---
+title: "Today I Learnt: Getting Started with Oso Authorization in Node.js"
+date: "2025-09-16"
+tags: ["node", "auth", "oso", "til"]
+draft: false
+summary: "How to add policy-based authorization using Oso in a Node.js app with a minimal example."
+---
+
+Oso provides a concise policy language (Polar) for authorization. Treat authentication as who you are, and Oso policies decide what the identity can do.
+
+Quick example (Express + Oso):
+
+```js
+// install: npm i oso express
+const express = require("express");
+const { Oso } = require("oso");
+
+const oso = new Oso();
+oso.loadStr(`allow(actor, action, resource) if actor.role = "admin";`);
+
+const app = express();
+app.get("/invoices/:id", async (req, res) => {
+  const user = { id: 1, role: "admin" }; // from auth middleware
+  const invoice = { id: +req.params.id, ownerId: 1 };
+  const allowed = await oso.isAllowed(user, "read", invoice);
+  res.status(allowed ? 200 : 403).json(invoice);
+});
+```
+
+Tips:
+
+- Keep policies declarative and small.
+- Use resources that represent domain objects, not HTTP routes.
+- Run policy tests — Oso supports unit-testing Polar rules.
+
+Resources: Oso docs for Polar language and SDK usage per language.

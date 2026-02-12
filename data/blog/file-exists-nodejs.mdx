@@ -1,0 +1,72 @@
+---
+title: "How to Check if a File Exists in Node.js"
+date: "2024-12-10"
+tags: ["nodejs", "file system", "javascript", "fs"]
+draft: false
+summary: "Learn the most up-to-date methods to check if a file exists in Node.js, including legacy approaches for older versions of Node."
+---
+
+In Node.js, checking whether a file exists can be done using several methods. Here's a breakdown of the most up-to-date methods as well as some legacy ones.
+
+## `fs.promises.access` (Recommended, Async/Await)
+
+Starting from Node.js v10, you can use `fs.promises.access()` to check if a file exists asynchronously. It returns a promise, which makes it perfect for modern async/await patterns.
+
+```javascript
+const fs = require("fs").promises;
+
+async function checkFileExists(filePath) {
+  try {
+    await fs.access(filePath);
+    console.log("File exists.");
+  } catch (error) {
+    console.log("File does not exist.");
+  }
+}
+```
+
+## `fs.access()` (Callback Version)
+
+For versions earlier than Node.js v10 or if you prefer callbacks, you can use the traditional `fs.access()` method, which takes a callback function.
+
+```javascript
+const fs = require("fs");
+
+fs.access("path/to/file", (error) => {
+  if (error) {
+    console.log("File does not exist.");
+  } else {
+    console.log("File exists.");
+  }
+});
+```
+
+## `fs.existsSync()` (Synchronous Method)
+
+If you need a synchronous check (though this blocks the event loop), you can use `fs.existsSync()`:
+
+```js
+const fs = require("fs");
+
+if (fs.existsSync("path/to/file")) {
+  console.log("File exists.");
+} else {
+  console.log("File does not exist.");
+}
+```
+
+## Legacy Method: `fs.exists()` (Deprecated)
+
+Before Node.js v10, the common method was `fs.exists()`. This method is now deprecated because it doesn't follow the standard error-first callback pattern and has been replaced by `fs.access()`.
+
+```js
+const fs = require("fs");
+
+fs.exists("path/to/file", (exists) => {
+  console.log(exists ? "File exists." : "File does not exist.");
+});
+```
+
+## Conclusion
+
+The recommended approach is to use `fs.promises.access()` for asynchronous code or `fs.access()` for callback-based code. Only use `fs.existsSync()` if you need a blocking synchronous check, and avoid using the legacy `fs.exists()` as it is deprecated.

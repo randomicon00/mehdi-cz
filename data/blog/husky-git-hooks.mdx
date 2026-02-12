@@ -1,0 +1,30 @@
+---
+title: "Today I Learned About Husky"
+date: "2025-02-27"
+tags: ["git", "husky", "linting", "hooks", "automation"]
+draft: false
+summary: "A personal reflection on learning how Husky automates Git hooks for pre-commit tasks like linting, ensuring cleaner code without manual intervention."
+---
+
+Today I learned about **Husky** and its role in managing Git hooks. I had seen a husky folder in my project but hadn’t fully understood its purpose until now. Husky helps automate tasks like linting or running tests before committing code, making sure your codebase stays clean without you needing to remember to do it manually.
+
+The typical folder structure looks something like this:
+
+```text
+project/
+│
+├── .husky/
+│   ├── pre-commit
+│   └── post-commit
+│
+└── package.json
+```
+
+In my project, I found a script like this:
+
+```bash
+npx --no-install lint-staged
+```
+
+This command tells Husky to run `lint-staged` before a commit. It’s really helpful because it ensures that
+only the staged files are linted, making my commit process smoother and error-free.

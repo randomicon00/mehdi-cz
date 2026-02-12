@@ -1,0 +1,40 @@
+---
+title: "Go REST API Starter: Minimal and Clear"
+date: "2025-09-17"
+tags: ["go", "api", "backend"]
+draft: false
+summary: "Start a tiny Go REST API with net/http. Simple routes, JSON, and clean structure."
+---
+
+Build a tiny API first. Keep it small and readable.
+
+## Steps
+
+- Use net/http
+- One route: GET /health
+- Return JSON
+
+## Code (short)
+
+```go
+package main
+
+import (
+  "encoding/json"
+  "net/http"
+)
+
+func main() {
+  http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+  })
+  http.ListenAndServe(":8080", nil)
+}
+```
+
+## Tips
+
+- Keep handlers small
+- Set content-type headers
+- Return clear errors

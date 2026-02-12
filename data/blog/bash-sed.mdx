@@ -1,0 +1,17 @@
+---
+title: "Stream edit files with sed"
+date: "2025-09-16"
+tags: ["bash", "til"]
+draft: false
+summary: "sed performs text transforms in a stream; safe inline edits with backups."
+---
+
+Replace text (inline with backup):
+
+```bash
+sed -i.bak 's/old/new/g' file.txt
+```
+
+Use `-r` or `-E` for extended regex and `sed -n` to suppress default printing.
+
+Tip: `ed`/`ex` can be easier for scripted in-place edits on macOS where sed differs.

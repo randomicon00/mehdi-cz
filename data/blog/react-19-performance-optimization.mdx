@@ -1,0 +1,2234 @@
+---
+title: "React 19 Performance Optimization: Complete Guide to Building Lightning-Fast Applications"
+date: "2025-09-15"
+tags:
+  [
+    "React",
+    "React 19",
+    "Performance",
+    "Optimization",
+    "Core Web Vitals",
+    "Bundle Analysis",
+    "JavaScript",
+    "Next.js",
+  ]
+draft: false
+summary: "Master React 19 performance optimization with advanced techniques, real-world examples, and comprehensive strategies for building lightning-fast applications that excel in Core Web Vitals. Includes React Compiler deep-dive, enterprise monitoring, anti-patterns, benchmarking framework, and performance roadmap."
+---
+
+# React 19 Performance Optimization: Complete Guide to Building Lightning-Fast Applications
+
+Performance is not just a feature—it's a fundamental requirement for modern web applications. React 19 introduces powerful new performance capabilities while maintaining the framework's commitment to speed and efficiency. This comprehensive guide covers everything you need to know to build lightning-fast React applications that excel in Core Web Vitals and deliver exceptional user experiences.
+
+## 📊 Understanding Performance in React 19
+
+### Core Web Vitals and React
+
+React 19's performance optimizations directly impact your Core Web Vitals scores:
+
+- **Largest Contentful Paint (LCP)**: Affected by bundle size and rendering performance
+- **First Input Delay (FID)**: Improved by concurrent rendering and optimized interactions
+- **Cumulative Layout Shift (CLS)**: Reduced through better state management and layout stability
+
+### React 19 Performance Features
+
+```javascript
+// React 19's key performance features
+const react19PerformanceFeatures = {
+  concurrentRendering: "Non-blocking UI updates",
+  automaticBatching: "Reduced re-renders",
+  useDeferredValue: "Deferred expensive computations",
+  useTransition: "Smooth loading states",
+  reactCompiler: "Automatic optimization",
+  serverComponents: "Reduced bundle size",
+};
+```
+
+## 🚀 Bundle Optimization Strategies
+
+### 1. Code Splitting with React 19
+
+React 19 enhances code splitting with better support for dynamic imports and lazy loading:
+
+```jsx
+// Route-based code splitting
+import { lazy, Suspense } from "react";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+
+// Lazy load route components
+const Home = lazy(() => import("./pages/Home"));
+const About = lazy(() => import("./pages/About"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Admin = lazy(() => import("./pages/Admin"));
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Suspense fallback={<PageSkeleton />}>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route
+            path="/admin"
+            element={
+              <AdminSuspense>
+                <Admin />
+              </AdminSuspense>
+            }
+          />
+        </Routes>
+      </Suspense>
+    </BrowserRouter>
+  );
+}
+
+// Different fallback for admin (heavier component)
+function AdminSuspense({ children }) {
+  return <Suspense fallback={<AdminSkeleton />}>{children}</Suspense>;
+}
+```
+
+### 2. Tree Shaking and Dead Code Elimination
+
+```javascript
+// Before: Import everything (bloated bundle)
+import _ from "lodash"; // 100KB+
+// Use only 2 methods but import entire library
+
+// After: Selective imports (optimized bundle)
+import isEqual from "lodash/isEqual";
+import debounce from "lodash/debounce";
+
+// For React: Use selective imports
+import { useState, useEffect, useMemo } from "react";
+// Instead of: import React from 'react'
+```
+
+### 3. Bundle Analysis and Optimization
+
+```javascript
+// webpack.config.js - Bundle analysis setup
+const { BundleAnalyzerPlugin } = require("webpack-bundle-analyzer");
+
+module.exports = {
+  plugins: [
+    new BundleAnalyzerPlugin({
+      analyzerMode: "static",
+      reportFilename: "bundle-report.html",
+      openAnalyzer: false,
+    }),
+  ],
+  optimization: {
+    splitChunks: {
+      chunks: "all",
+      cacheGroups: {
+        vendor: {
+          test: /[\\/]node_modules[\\/]/,
+          name: "vendors",
+          chunks: "all",
+        },
+        react: {
+          test: /[\\/]node_modules[\\/]react/,
+          name: "react",
+          chunks: "all",
+        },
+      },
+    },
+  },
+};
+```
+
+### 4. Dynamic Imports with React 19
+
+```jsx
+// Component-level code splitting
+function ProductList({ category }) {
+  const [ProductGrid, setProductGrid] = useState(null);
+
+  useEffect(() => {
+    // Dynamic import based on category
+    const loadComponent = async () => {
+      try {
+        let component;
+        switch (category) {
+          case "electronics":
+            component = (await import("./grids/ElectronicsGrid")).default;
+            break;
+          case "clothing":
+            component = (await import("./grids/ClothingGrid")).default;
+            break;
+          default:
+            component = (await import("./grids/DefaultGrid")).default;
+        }
+        setProductGrid(() => component);
+      } catch (error) {
+        console.error("Failed to load component:", error);
+        // Fallback to default
+        const defaultComponent = (await import("./grids/DefaultGrid")).default;
+        setProductGrid(() => defaultComponent);
+      }
+    };
+
+    loadComponent();
+  }, [category]);
+
+  if (!ProductGrid) return <LoadingGrid />;
+
+  return <ProductGrid />;
+}
+```
+
+## ⚡ Runtime Performance Optimization
+
+### 1. React 19 Concurrent Rendering
+
+```jsx
+// Leveraging useDeferredValue for expensive computations
+import { useDeferredValue, useMemo } from "react";
+
+function SearchComponent({ data }) {
+  const [query, setQuery] = useState("");
+  const deferredQuery = useDeferredValue(query);
+
+  // Expensive computation uses deferred value
+  const filteredResults = useMemo(() => {
+    if (!deferredQuery) return data;
+
+    // Simulate expensive filtering
+    const start = performance.now();
+    while (performance.now() - start < 50) {
+      // Expensive computation
+    }
+
+    return data.filter((item) => item.name.toLowerCase().includes(deferredQuery.toLowerCase()));
+  }, [data, deferredQuery]);
+
+  const isStale = query !== deferredQuery;
+
+  return (
+    <div>
+      <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search..." />
+
+      {isStale && <div>🔄 Updating results...</div>}
+
+      <ResultsList results={filteredResults} />
+    </div>
+  );
+}
+```
+
+### 2. useTransition for Non-Blocking Updates
+
+```jsx
+// Smooth navigation with useTransition
+import { useTransition } from "react";
+
+function Navigation({ routes }) {
+  const [currentRoute, setCurrentRoute] = useState("/");
+  const [isPending, startTransition] = useTransition();
+
+  const navigate = (route) => {
+    startTransition(() => {
+      setCurrentRoute(route);
+    });
+  };
+
+  return (
+    <div>
+      <nav>
+        {routes.map((route) => (
+          <button
+            key={route.path}
+            onClick={() => navigate(route.path)}
+            disabled={isPending}
+            className={isPending ? "loading" : ""}
+          >
+            {route.name}
+            {isPending && currentRoute === route.path && " (Loading...)"}
+          </button>
+        ))}
+      </nav>
+
+      <main>
+        <Suspense fallback={<PageSkeleton />}>
+          <RouteContent route={currentRoute} />
+        </Suspense>
+      </main>
+    </div>
+  );
+}
+```
+
+### 3. Optimizing Re-renders with useMemo and useCallback
+
+```jsx
+// Advanced memoization patterns
+function DataTable({ data, onSort, filters }) {
+  // Memoize expensive computations
+  const processedData = useMemo(() => {
+    let result = [...data];
+
+    // Apply filters
+    if (filters.search) {
+      result = result.filter((item) =>
+        item.name.toLowerCase().includes(filters.search.toLowerCase())
+      );
+    }
+
+    // Apply sorting
+    if (filters.sortBy) {
+      result.sort((a, b) => {
+        const aVal = a[filters.sortBy];
+        const bVal = b[filters.sortBy];
+        return filters.sortOrder === "asc" ? aVal - bVal : bVal - aVal;
+      });
+    }
+
+    return result;
+  }, [data, filters]);
+
+  // Memoize event handlers
+  const handleSort = useCallback(
+    (column) => {
+      onSort(column);
+    },
+    [onSort]
+  );
+
+  const handleFilter = useCallback(
+    (newFilters) => {
+      onSort({ ...filters, ...newFilters });
+    },
+    [filters, onSort]
+  );
+
+  return (
+    <div>
+      <TableFilters onFilter={handleFilter} />
+      <Table
+        data={processedData}
+        onSort={handleSort}
+        sortColumn={filters.sortBy}
+        sortOrder={filters.sortOrder}
+      />
+    </div>
+  );
+}
+```
+
+### 4. Virtual Scrolling for Large Lists
+
+```jsx
+// Virtual scrolling implementation
+function VirtualizedList({ items, itemHeight = 50, containerHeight = 400 }) {
+  const [scrollTop, setScrollTop] = useState(0);
+
+  const startIndex = Math.floor(scrollTop / itemHeight);
+  const endIndex = Math.min(startIndex + Math.ceil(containerHeight / itemHeight), items.length - 1);
+
+  const visibleItems = items.slice(startIndex, endIndex + 1);
+
+  const handleScroll = (e) => {
+    setScrollTop(e.target.scrollTop);
+  };
+
+  return (
+    <div
+      className="virtual-list"
+      style={{ height: containerHeight, overflow: "auto" }}
+      onScroll={handleScroll}
+    >
+      <div style={{ height: items.length * itemHeight, position: "relative" }}>
+        <div
+          style={{
+            transform: `translateY(${startIndex * itemHeight}px)`,
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+          }}
+        >
+          {visibleItems.map((item, index) => (
+            <div key={startIndex + index} style={{ height: itemHeight }} className="virtual-item">
+              {item.content}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+## 🎯 Memory Management and Leak Prevention
+
+### 1. Proper Cleanup in useEffect
+
+```jsx
+// Memory leak prevention
+function DataFetcher({ url }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const abortController = new AbortController();
+
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const response = await fetch(url, {
+          signal: abortController.signal,
+        });
+
+        if (!isMounted) return;
+
+        const result = await response.json();
+
+        if (isMounted) {
+          setData(result);
+        }
+      } catch (error) {
+        if (error.name !== "AbortError" && isMounted) {
+          console.error("Fetch error:", error);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchData();
+
+    // Cleanup function
+    return () => {
+      isMounted = false;
+      abortController.abort();
+    };
+  }, [url]);
+
+  return (
+    <div>
+      {loading && <div>Loading...</div>}
+      {data && <div>{JSON.stringify(data)}</div>}
+    </div>
+  );
+}
+```
+
+### 2. Event Listener Cleanup
+
+```jsx
+// Proper event listener management
+function WindowResizeHandler({ onResize }) {
+  const [dimensions, setDimensions] = useState({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  });
+
+  useEffect(() => {
+    let timeoutId;
+
+    const handleResize = () => {
+      // Debounce resize events
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        const newDimensions = {
+          width: window.innerWidth,
+          height: window.innerHeight,
+        };
+        setDimensions(newDimensions);
+        onResize?.(newDimensions);
+      }, 150);
+    };
+
+    window.addEventListener("resize", handleResize, { passive: true });
+
+    // Cleanup
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [onResize]);
+
+  return (
+    <div>
+      Window: {dimensions.width} x {dimensions.height}
+    </div>
+  );
+}
+```
+
+### 3. useRef for DOM Access Without Re-renders
+
+```jsx
+// Optimizing DOM access
+function AutoFocusInput({ shouldFocus }) {
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (shouldFocus && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [shouldFocus]);
+
+  return <input ref={inputRef} type="text" placeholder="Auto-focused input" />;
+}
+
+// Avoiding unnecessary re-renders with refs
+function Counter() {
+  const countRef = useRef(0);
+  const [displayCount, setDisplayCount] = useState(0);
+
+  const increment = () => {
+    countRef.current += 1;
+
+    // Only update display every 5 increments
+    if (countRef.current % 5 === 0) {
+      setDisplayCount(countRef.current);
+    }
+  };
+
+  return (
+    <div>
+      <button onClick={increment}>Increment</button>
+      <div>Count: {displayCount}</div>
+      <div>Actual count: {countRef.current}</div>
+    </div>
+  );
+}
+```
+
+## 🌐 Network Optimization
+
+### 1. HTTP/2 Server Push and Preloading
+
+```jsx
+// Preloading critical resources
+function App() {
+  useEffect(() => {
+    // Preload critical routes
+    const criticalRoutes = ["/dashboard", "/profile"];
+
+    criticalRoutes.forEach((route) => {
+      const link = document.createElement("link");
+      link.rel = "prefetch";
+      link.href = route;
+      document.head.appendChild(link);
+    });
+
+    // Preload critical components
+    import("./components/CriticalComponent");
+  }, []);
+
+  return <div>Your app content</div>;
+}
+
+// Dynamic preloading based on user behavior
+function SmartPreloader({ userActions }) {
+  useEffect(() => {
+    const preloadBasedOnAction = (action) => {
+      switch (action) {
+        case "viewed-products":
+          import("./components/ProductGrid");
+          break;
+        case "started-checkout":
+          import("./components/CheckoutForm");
+          break;
+        case "viewed-profile":
+          import("./components/UserProfile");
+          break;
+      }
+    };
+
+    userActions.forEach(preloadBasedOnAction);
+  }, [userActions]);
+
+  return null;
+}
+```
+
+### 2. API Optimization with React Query/SWR
+
+```jsx
+// Optimized data fetching with caching
+import { useQuery, QueryClient, QueryClientProvider } from "react-query";
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      cacheTime: 10 * 60 * 1000, // 10 minutes
+      refetchOnWindowFocus: false,
+      retry: (failureCount, error) => {
+        // Don't retry on 4xx errors
+        if (error?.status >= 400 && error?.status < 500) {
+          return false;
+        }
+        return failureCount < 3;
+      },
+    },
+  },
+});
+
+function OptimizedDataComponent({ userId }) {
+  const { data, isLoading, error, refetch } = useQuery(["user", userId], () => fetchUser(userId), {
+    // Additional optimizations
+    enabled: !!userId, // Only fetch if userId exists
+    refetchInterval: 30 * 1000, // Refetch every 30 seconds
+    select: (data) => ({
+      // Transform data to only include what we need
+      id: data.id,
+      name: data.name,
+      email: data.email,
+    }),
+  });
+
+  if (isLoading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error.message}</div>;
+
+  return (
+    <div>
+      <h2>{data.name}</h2>
+      <p>{data.email}</p>
+      <button onClick={() => refetch()}>Refresh</button>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <OptimizedDataComponent userId="123" />
+    </QueryClientProvider>
+  );
+}
+```
+
+### 3. Image Optimization
+
+```jsx
+// Modern image optimization
+function OptimizedImage({ src, alt, width, height, priority = false }) {
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [hasError, setHasError] = useState(false);
+  const imgRef = useRef(null);
+
+  useEffect(() => {
+    const img = new Image();
+    img.onload = () => setIsLoaded(true);
+    img.onerror = () => setHasError(true);
+    img.src = src;
+  }, [src]);
+
+  // Intersection Observer for lazy loading
+  useEffect(() => {
+    if (!imgRef.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const img = entry.target;
+            img.src = src;
+            observer.unobserve(img);
+          }
+        });
+      },
+      { rootMargin: "50px" }
+    );
+
+    observer.observe(imgRef.current);
+
+    return () => observer.disconnect();
+  }, [src]);
+
+  return (
+    <div className="image-container">
+      {!isLoaded && !hasError && <div className="image-placeholder" />}
+      {hasError && <div className="image-error">Failed to load image</div>}
+
+      <img
+        ref={imgRef}
+        src={priority ? src : undefined}
+        alt={alt}
+        width={width}
+        height={height}
+        loading={priority ? "eager" : "lazy"}
+        decoding="async"
+        className={`optimized-image ${isLoaded ? "loaded" : "loading"}`}
+        onLoad={() => setIsLoaded(true)}
+        onError={() => setHasError(true)}
+      />
+    </div>
+  );
+}
+
+// Usage with modern formats
+function ProductImage({ product }) {
+  return (
+    <picture>
+      <source srcSet={`${product.image.webp} 1x, ${product.image.webp2x} 2x`} type="image/webp" />
+      <OptimizedImage
+        src={product.image.jpg}
+        srcSet={`${product.image.jpg} 1x, ${product.image.jpg2x} 2x`}
+        alt={product.name}
+        width={300}
+        height={300}
+      />
+    </picture>
+  );
+}
+```
+
+## 📈 Performance Monitoring and Analytics
+
+### 1. Core Web Vitals Tracking
+
+```jsx
+// Comprehensive Core Web Vitals monitoring
+function WebVitalsTracker() {
+  useEffect(() => {
+    // Only load in production
+    if (process.env.NODE_ENV !== "production") return;
+
+    import("web-vitals").then(({ getCLS, getFID, getFCP, getLCP, getTTFB }) => {
+      // Track each metric
+      getCLS((metric) => {
+        console.log("CLS:", metric);
+        // Send to analytics
+        sendToAnalytics("CLS", metric);
+      });
+
+      getFID((metric) => {
+        console.log("FID:", metric);
+        sendToAnalytics("FID", metric);
+      });
+
+      getFCP((metric) => {
+        console.log("FCP:", metric);
+        sendToAnalytics("FCP", metric);
+      });
+
+      getLCP((metric) => {
+        console.log("LCP:", metric);
+        sendToAnalytics("LCP", metric);
+      });
+
+      getTTFB((metric) => {
+        console.log("TTFB:", metric);
+        sendToAnalytics("TTFB", metric);
+      });
+    });
+  }, []);
+
+  return null;
+}
+
+function sendToAnalytics(metricName, metric) {
+  // Send to your analytics service
+  if (typeof window !== "undefined" && window.gtag) {
+    window.gtag("event", "web_vitals", {
+      event_category: "Web Vitals",
+      event_label: metricName,
+      value: Math.round(metric.value),
+      custom_map: {
+        metric_value: metric.value,
+        metric_rating: metric.rating,
+      },
+    });
+  }
+}
+```
+
+### 2. React Performance DevTools Integration
+
+```jsx
+// Performance profiling in development
+function PerformanceProfiler({ children }) {
+  const [profilerData, setProfilerData] = useState([]);
+
+  const handleRender = (id, phase, actualDuration, baseDuration, startTime, commitTime) => {
+    const data = {
+      id,
+      phase,
+      actualDuration,
+      baseDuration,
+      startTime,
+      commitTime,
+      timestamp: Date.now(),
+    };
+
+    setProfilerData((prev) => [...prev.slice(-49), data]); // Keep last 50 renders
+
+    // Log slow renders
+    if (actualDuration > 16.67) {
+      // More than one frame at 60fps
+      console.warn(`Slow render in ${id}: ${actualDuration}ms`);
+    }
+  };
+
+  return (
+    <React.Profiler id="App" onRender={handleRender}>
+      {children}
+    </React.Profiler>
+  );
+}
+
+// Usage
+function App() {
+  return (
+    <PerformanceProfiler>
+      <YourAppComponents />
+    </PerformanceProfiler>
+  );
+}
+```
+
+### 3. Custom Performance Metrics
+
+```jsx
+// Custom performance tracking
+function usePerformanceTracker(name) {
+  const startTimeRef = useRef(null);
+  const [metrics, setMetrics] = useState({});
+
+  const start = useCallback(() => {
+    startTimeRef.current = performance.now();
+  }, []);
+
+  const end = useCallback(() => {
+    if (startTimeRef.current) {
+      const duration = performance.now() - startTimeRef.current;
+      const metric = {
+        name,
+        duration,
+        timestamp: Date.now(),
+      };
+
+      setMetrics((prev) => ({
+        ...prev,
+        [name]: metric,
+      }));
+
+      // Log slow operations
+      if (duration > 100) {
+        console.warn(`Slow operation: ${name} took ${duration}ms`);
+      }
+
+      startTimeRef.current = null;
+      return metric;
+    }
+  }, [name]);
+
+  const measure = useCallback(
+    (fn) => {
+      start();
+      const result = fn();
+      if (result instanceof Promise) {
+        return result.finally(end);
+      } else {
+        end();
+        return result;
+      }
+    },
+    [start, end]
+  );
+
+  return { start, end, measure, metrics };
+}
+
+// Usage
+function DataProcessor({ data }) {
+  const { measure, metrics } = usePerformanceTracker("data-processing");
+
+  const processData = useCallback(async () => {
+    const result = await measure(async () => {
+      // Expensive data processing
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      return data.map((item) => ({ ...item, processed: true }));
+    });
+
+    return result;
+  }, [data, measure]);
+
+  return (
+    <div>
+      <button onClick={processData}>Process Data</button>
+      {metrics["data-processing"] && (
+        <div>Last processing took: {metrics["data-processing"].duration.toFixed(2)}ms</div>
+      )}
+    </div>
+  );
+}
+```
+
+## 🧪 Performance Testing Strategies
+
+### 1. Automated Performance Tests
+
+```javascript
+// Lighthouse CI configuration
+// .github/workflows/lighthouse.yml
+name: Lighthouse CI
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  lighthouse:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Build
+        run: npm run build
+
+      - name: Serve and test
+        run: |
+          npm run serve &
+          npx lhci autorun
+
+# lighthouserc.js
+module.exports = {
+  ci: {
+    collect: {
+      startServerCommand: 'npm run serve',
+      startServerReadyPattern: 'Local:.+(https?://.+)',
+      url: ['http://localhost:3000'],
+      numberOfRuns: 3,
+    },
+    upload: {
+      target: 'temporary-public-storage',
+    },
+    assert: {
+      assertions: {
+        'categories:performance': ['error', { minScore: 0.9 }],
+        'categories:accessibility': ['error', { minScore: 0.9 }],
+        'categories:best-practices': ['error', { minScore: 0.9 }],
+        'categories:seo': ['error', { minScore: 0.9 }],
+      },
+    },
+  },
+};
+```
+
+### 2. React Testing with Performance Assertions
+
+```jsx
+// Performance-focused React testing
+import { render, screen, waitFor } from "@testing-library/react";
+import { act } from "react-dom/test-utils";
+
+// Test component render performance
+test("renders large list within performance budget", async () => {
+  const startTime = performance.now();
+
+  const { container } = render(<LargeList items={largeDataset} />);
+
+  // Wait for render to complete
+  await waitFor(() => {
+    expect(screen.getByText("Item 999")).toBeInTheDocument();
+  });
+
+  const renderTime = performance.now() - startTime;
+
+  // Assert performance budget
+  expect(renderTime).toBeLessThan(100); // Should render within 100ms
+
+  // Check for unnecessary re-renders
+  const listItems = container.querySelectorAll(".list-item");
+  expect(listItems).toHaveLength(1000);
+});
+
+// Test with React Profiler
+function PerformanceTestWrapper({ children }) {
+  const [renderTimes, setRenderTimes] = useState([]);
+
+  const handleRender = (id, phase, actualDuration) => {
+    setRenderTimes((prev) => [...prev, { id, phase, actualDuration }]);
+  };
+
+  return (
+    <React.Profiler id="performance-test" onRender={handleRender}>
+      {children}
+      <div data-testid="render-times">{JSON.stringify(renderTimes)}</div>
+    </React.Profiler>
+  );
+}
+
+test("component re-renders efficiently", () => {
+  render(
+    <PerformanceTestWrapper>
+      <TestComponent />
+    </PerformanceTestWrapper>
+  );
+
+  // Trigger multiple updates
+  fireEvent.click(screen.getByText("Update"));
+
+  // Check render performance
+  const renderData = JSON.parse(screen.getByTestId("render-times").textContent);
+  const slowRenders = renderData.filter((render) => render.actualDuration > 16.67);
+
+  expect(slowRenders).toHaveLength(0);
+});
+```
+
+## 🚀 Advanced Optimization Patterns
+
+### 1. React 19 Compiler Integration
+
+```jsx
+// Enabling React Compiler for automatic optimizations
+// next.config.js
+module.exports = {
+  experimental: {
+    reactCompiler: true,
+  },
+};
+
+// Manual optimization with compiler hints
+function OptimizedComponent({ data, filter }) {
+  // React Compiler will automatically optimize this
+  const filteredData = useMemo(() => {
+    return data.filter((item) => {
+      // Complex filtering logic
+      return item.value > filter.min && item.value < filter.max;
+    });
+  }, [data, filter]);
+
+  return (
+    <div>
+      {filteredData.map((item) => (
+        <div key={item.id}>
+          {/* React Compiler optimizes JSX automatically */}
+          <h3>{item.title}</h3>
+          <p>{item.description}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+### 2. Micro-Optimizations for Maximum Performance
+
+```jsx
+// Advanced React patterns for peak performance
+function UltraOptimizedList({ items }) {
+  // Pre-allocate arrays for better memory performance
+  const itemElements = useMemo(() => {
+    const elements = new Array(items.length);
+
+    for (let i = 0; i < items.length; i++) {
+      elements[i] = <ListItem key={items[i].id} item={items[i]} index={i} />;
+    }
+
+    return elements;
+  }, [items]);
+
+  return <div className="optimized-list">{itemElements}</div>;
+}
+
+// Zero-re-render optimization with refs
+function ZeroRenderCounter() {
+  const countRef = useRef(0);
+  const displayRef = useRef(null);
+
+  const increment = useCallback(() => {
+    countRef.current += 1;
+
+    // Direct DOM manipulation for zero re-renders
+    if (displayRef.current) {
+      displayRef.current.textContent = countRef.current.toString();
+    }
+  }, []);
+
+  return (
+    <div>
+      <button onClick={increment}>Increment</button>
+      <span ref={displayRef}>0</span>
+    </div>
+  );
+}
+
+// Context optimization with selectors
+const ThemeContext = createContext();
+
+function useThemeSelector(selector) {
+  const theme = useContext(ThemeContext);
+
+  return useMemo(() => selector(theme), [theme, selector]);
+}
+
+function ThemedComponent() {
+  // Only re-renders when selected theme property changes
+  const backgroundColor = useThemeSelector((theme) => theme.colors.background);
+  const fontSize = useThemeSelector((theme) => theme.typography.fontSize);
+
+  return <div style={{ backgroundColor, fontSize }}>Themed content</div>;
+}
+```
+
+## 📊 Real-World Performance Case Studies
+
+### Case Study 1: E-commerce Platform Optimization
+
+**Before Optimization:**
+
+- First Contentful Paint: 3.2s
+- Largest Contentful Paint: 4.8s
+- Bundle Size: 2.8MB
+- Time to Interactive: 6.1s
+
+**After Optimization:**
+
+- First Contentful Paint: 1.1s (65% improvement)
+- Largest Contentful Paint: 2.1s (56% improvement)
+- Bundle Size: 1.2MB (57% reduction)
+- Time to Interactive: 2.8s (54% improvement)
+
+**Techniques Applied:**
+
+```jsx
+// 1. Route-based code splitting
+const ProductPage = lazy(() => import('./pages/ProductPage'));
+const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
+
+// 2. Image optimization with modern formats
+<picture>
+  <source srcSet="product.webp" type="image/webp" />
+  <img src="product.jpg" loading="lazy" decoding="async" />
+</picture>
+
+// 3. Virtual scrolling for product lists
+<VirtualizedList items={products} itemHeight={200} />
+
+// 4. Optimistic updates for cart operations
+const [cart, setCart] = useOptimistic(cartState);
+```
+
+### Case Study 2: Dashboard Application Performance
+
+**Challenge:** Real-time dashboard with multiple data sources and frequent updates.
+
+**Solution:**
+
+```jsx
+// 1. Debounced data fetching
+function useDebouncedData(url, delay = 300) {
+  const [data, setData] = useState(null);
+  const [debouncedUrl, setDebouncedUrl] = useState(url);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedUrl(url), delay);
+    return () => clearTimeout(timer);
+  }, [url, delay]);
+
+  useEffect(() => {
+    fetch(debouncedUrl).then(setData);
+  }, [debouncedUrl]);
+
+  return data;
+}
+
+// 2. Memoized chart components
+const MemoizedChart = memo(function Chart({ data, type }) {
+  return <ChartComponent data={data} type={type} />;
+});
+
+// 3. WebSocket optimization with useDeferredValue
+function RealTimeDashboard({ socketData }) {
+  const deferredData = useDeferredValue(socketData);
+
+  const processedMetrics = useMemo(() => {
+    return processMetrics(deferredData);
+  }, [deferredData]);
+
+  return <Dashboard metrics={processedMetrics} />;
+}
+```
+
+## 🎯 Performance Checklist
+
+### Bundle Optimization ✅
+
+- [ ] Implement code splitting
+- [ ] Use tree shaking
+- [ ] Optimize bundle size (< 500KB gzipped)
+- [ ] Implement lazy loading
+- [ ] Use dynamic imports
+
+### Runtime Performance ✅
+
+- [ ] Use React.memo for expensive components
+- [ ] Implement useMemo for expensive calculations
+- [ ] Use useCallback for event handlers
+- [ ] Optimize re-renders
+- [ ] Use virtual scrolling for large lists
+
+### Memory Management ✅
+
+- [ ] Clean up useEffect properly
+- [ ] Remove event listeners
+- [ ] Cancel async operations
+- [ ] Use useRef for DOM access
+- [ ] Avoid memory leaks
+
+### Network Optimization ✅
+
+- [ ] Implement HTTP/2 server push
+- [ ] Use resource hints (preload, prefetch)
+- [ ] Optimize images
+- [ ] Cache API responses
+- [ ] Use service workers
+
+### Monitoring & Analytics ✅
+
+- [ ] Track Core Web Vitals
+- [ ] Monitor bundle size
+- [ ] Profile component performance
+- [ ] Set up error tracking
+- [ ] Implement performance budgets
+
+## 🧠 React 19 Compiler: Automatic Performance Optimization
+
+### Understanding the React Compiler
+
+React 19 introduces a revolutionary compiler that automatically optimizes your code without requiring manual intervention. This compiler analyzes your components and applies optimizations that previously required expert knowledge.
+
+```jsx
+// Before React Compiler - Manual optimization required
+function TodoList({ todos, filter }) {
+  const [filteredTodos, setFilteredTodos] = useState([]);
+
+  useEffect(() => {
+    const filtered = todos.filter((todo) => {
+      switch (filter) {
+        case "completed":
+          return todo.completed;
+        case "active":
+          return !todo.completed;
+        default:
+          return true;
+      }
+    });
+    setFilteredTodos(filtered);
+  }, [todos, filter]);
+
+  return (
+    <ul>
+      {filteredTodos.map((todo) => (
+        <li key={todo.id}>{todo.text}</li>
+      ))}
+    </ul>
+  );
+}
+
+// After React Compiler - Automatic optimization
+function TodoList({ todos, filter }) {
+  // Compiler automatically optimizes this computation
+  const filteredTodos = useMemo(() => {
+    return todos.filter((todo) => {
+      switch (filter) {
+        case "completed":
+          return todo.completed;
+        case "active":
+          return !todo.completed;
+        default:
+          return true;
+      }
+    });
+  }, [todos, filter]);
+
+  return (
+    <ul>
+      {filteredTodos.map((todo) => (
+        <li key={todo.id}>{todo.text}</li>
+      ))}
+    </ul>
+  );
+}
+```
+
+### Compiler Optimization Strategies
+
+The React Compiler applies several sophisticated optimizations:
+
+1. **Automatic Memoization**: Identifies expensive computations and wraps them in `useMemo`
+2. **Ref Elimination**: Removes unnecessary refs by tracking dependencies automatically
+3. **State Optimization**: Optimizes state updates to prevent unnecessary re-renders
+4. **Event Handler Optimization**: Automatically memoizes event handlers
+
+### Enabling the Compiler
+
+```javascript
+// next.config.js - Enable React Compiler
+module.exports = {
+  experimental: {
+    reactCompiler: true,
+  },
+};
+
+// For Vite projects
+// vite.config.js
+export default {
+  esbuild: {
+    jsx: "automatic",
+  },
+  define: {
+    __REACT_COMPILER__: true,
+  },
+};
+```
+
+### Compiler Limitations and Best Practices
+
+While the compiler is powerful, there are scenarios where manual optimization is still beneficial:
+
+```jsx
+// Manual optimization still needed for complex scenarios
+function ComplexDataProcessor({ data, config }) {
+  const processedData = useMemo(() => {
+    // Complex data processing that the compiler might not optimize perfectly
+    return data.reduce((acc, item) => {
+      const processed = expensiveTransformation(item, config);
+      return [...acc, processed];
+    }, []);
+  }, [data, config]);
+
+  // Manual optimization for performance-critical paths
+  const criticalValue = useMemo(() => {
+    return processedData.find((item) => item.priority === "high")?.value;
+  }, [processedData]);
+
+  return <DataDisplay data={processedData} criticalValue={criticalValue} />;
+}
+```
+
+## 🔬 Advanced Performance Profiling and Debugging
+
+### React DevTools Profiler Deep Dive
+
+```jsx
+// Advanced profiling setup
+import { Profiler } from "react";
+
+function PerformanceMonitor({ children, onRender }) {
+  const handleRender = useCallback(
+    (id, phase, actualDuration, baseDuration, startTime, commitTime, interactions) => {
+      // Log performance data
+      console.group(`🔍 Component: ${id}`);
+      console.log(`Phase: ${phase}`);
+      console.log(`Actual Duration: ${actualDuration.toFixed(2)}ms`);
+      console.log(`Base Duration: ${baseDuration.toFixed(2)}ms`);
+      console.log(`Start Time: ${startTime}`);
+      console.log(`Commit Time: ${commitTime}`);
+      console.log(`Interactions:`, interactions);
+      console.groupEnd();
+
+      // Send to analytics
+      if (typeof window !== "undefined" && window.gtag) {
+        window.gtag("event", "component_render", {
+          component_id: id,
+          phase,
+          actual_duration: actualDuration,
+          base_duration: baseDuration,
+        });
+      }
+
+      onRender?.(id, phase, actualDuration, baseDuration, startTime, commitTime, interactions);
+    },
+    [onRender]
+  );
+
+  return (
+    <Profiler id="performance-monitor" onRender={handleRender}>
+      {children}
+    </Profiler>
+  );
+}
+
+// Usage with detailed tracking
+function App() {
+  const [renderData, setRenderData] = useState([]);
+
+  const handleRender = (
+    id,
+    phase,
+    actualDuration,
+    baseDuration,
+    startTime,
+    commitTime,
+    interactions
+  ) => {
+    setRenderData((prev) => [
+      ...prev.slice(-99),
+      {
+        id,
+        phase,
+        actualDuration,
+        baseDuration,
+        startTime,
+        commitTime,
+        interactions: Array.from(interactions || []),
+        timestamp: Date.now(),
+      },
+    ]);
+  };
+
+  return (
+    <PerformanceMonitor onRender={handleRender}>
+      <YourApp />
+      <PerformanceDashboard data={renderData} />
+    </PerformanceMonitor>
+  );
+}
+```
+
+### Custom Performance Hooks
+
+```jsx
+// Advanced performance tracking hook
+function usePerformanceTracker(name, options = {}) {
+  const {
+    logToConsole = true,
+    sendToAnalytics = true,
+    slowThreshold = 16.67, // One frame at 60fps
+  } = options;
+
+  const renderCountRef = useRef(0);
+  const lastRenderTimeRef = useRef(performance.now());
+  const totalRenderTimeRef = useRef(0);
+
+  useEffect(() => {
+    const now = performance.now();
+    const renderTime = now - lastRenderTimeRef.current;
+    totalRenderTimeRef.current += renderTime;
+    renderCountRef.current += 1;
+
+    const averageRenderTime = totalRenderTimeRef.current / renderCountRef.current;
+
+    if (logToConsole) {
+      console.log(
+        `[${name}] Render #${renderCountRef.current}: ${renderTime.toFixed(2)}ms (avg: ${averageRenderTime.toFixed(2)}ms)`
+      );
+    }
+
+    if (renderTime > slowThreshold) {
+      console.warn(`🚨 [${name}] Slow render detected: ${renderTime.toFixed(2)}ms`);
+
+      if (sendToAnalytics && typeof window !== "undefined" && window.gtag) {
+        window.gtag("event", "slow_render", {
+          component_name: name,
+          render_time: renderTime,
+          render_count: renderCountRef.current,
+        });
+      }
+    }
+
+    lastRenderTimeRef.current = now;
+  });
+
+  return {
+    renderCount: renderCountRef.current,
+    averageRenderTime: totalRenderTimeRef.current / renderCountRef.current,
+    totalRenderTime: totalRenderTimeRef.current,
+  };
+}
+
+// Usage
+function ExpensiveComponent({ data }) {
+  const performance = usePerformanceTracker("ExpensiveComponent", {
+    slowThreshold: 8.33, // Stricter threshold for critical components
+  });
+
+  return (
+    <div>
+      <h3>Performance: {performance.averageRenderTime.toFixed(2)}ms avg</h3>
+      {/* Expensive rendering logic */}
+    </div>
+  );
+}
+```
+
+### Memory Leak Detection
+
+```jsx
+// Advanced memory leak detection
+function useMemoryLeakDetector(componentName) {
+  const mountedRef = useRef(true);
+  const effectsRef = useRef(new Set());
+  const timersRef = useRef(new Set());
+  const listenersRef = useRef(new Set());
+
+  useEffect(() => {
+    mountedRef.current = true;
+
+    // Cleanup on unmount
+    return () => {
+      mountedRef.current = false;
+
+      // Clear all tracked resources
+      effectsRef.current.forEach((cleanup) => {
+        if (typeof cleanup === "function") cleanup();
+      });
+      effectsRef.current.clear();
+
+      timersRef.current.forEach((timer) => clearTimeout(timer));
+      timersRef.current.clear();
+
+      listenersRef.current.forEach(({ element, event, handler }) => {
+        element.removeEventListener(event, handler);
+      });
+      listenersRef.current.clear();
+
+      console.log(`🧹 [${componentName}] Memory cleanup completed`);
+    };
+  }, [componentName]);
+
+  const trackEffect = useCallback((cleanup) => {
+    effectsRef.current.add(cleanup);
+    return () => {
+      effectsRef.current.delete(cleanup);
+      if (typeof cleanup === "function") cleanup();
+    };
+  }, []);
+
+  const trackTimer = useCallback((timerId) => {
+    timersRef.current.add(timerId);
+    return () => {
+      timersRef.current.delete(timerId);
+      clearTimeout(timerId);
+    };
+  }, []);
+
+  const trackListener = useCallback((element, event, handler) => {
+    const listener = { element, event, handler };
+    listenersRef.current.add(listener);
+    return () => {
+      listenersRef.current.delete(listener);
+      element.removeEventListener(event, handler);
+    };
+  }, []);
+
+  return { trackEffect, trackTimer, trackListener, isMounted: mountedRef.current };
+}
+
+// Usage
+function DataFetcher({ url }) {
+  const { trackEffect, trackTimer, trackListener, isMounted } =
+    useMemoryLeakDetector("DataFetcher");
+
+  useEffect(() => {
+    const abortController = new AbortController();
+
+    const fetchData = async () => {
+      try {
+        const response = await fetch(url, { signal: abortController.signal });
+        if (!isMounted) return;
+
+        const data = await response.json();
+        if (isMounted) {
+          setData(data);
+        }
+      } catch (error) {
+        if (error.name !== "AbortError" && isMounted) {
+          console.error("Fetch error:", error);
+        }
+      }
+    };
+
+    fetchData();
+
+    return trackEffect(() => abortController.abort());
+  }, [url, trackEffect, isMounted]);
+
+  return <div>{/* component content */}</div>;
+}
+```
+
+## 🏢 Enterprise Performance Strategies
+
+### Performance Budget Implementation
+
+```javascript
+// performance-budget.js
+export const PERFORMANCE_BUDGET = {
+  // Bundle size budgets
+  bundleSize: {
+    main: "500KB",
+    vendor: "300KB",
+    total: "800KB",
+  },
+
+  // Core Web Vitals budgets
+  coreWebVitals: {
+    lcp: 2500, // ms
+    fid: 100, // ms
+    cls: 0.1, // score
+  },
+
+  // Runtime performance budgets
+  runtime: {
+    maxRenderTime: 16.67, // ms (60fps)
+    maxMemoryUsage: "50MB",
+    maxConcurrentRequests: 6,
+  },
+
+  // Network budgets
+  network: {
+    maxRequests: 50,
+    maxImageSize: "500KB",
+    maxTotalSize: "2MB",
+  },
+};
+
+// Budget monitoring utility
+export function checkPerformanceBudget(metrics) {
+  const violations = [];
+
+  // Check bundle size
+  if (metrics.bundleSize.main > parseSize(PERFORMANCE_BUDGET.bundleSize.main)) {
+    violations.push({
+      type: "bundle-size",
+      metric: "main",
+      actual: metrics.bundleSize.main,
+      budget: PERFORMANCE_BUDGET.bundleSize.main,
+      severity: "high",
+    });
+  }
+
+  // Check Core Web Vitals
+  if (metrics.coreWebVitals.lcp > PERFORMANCE_BUDGET.coreWebVitals.lcp) {
+    violations.push({
+      type: "core-web-vitals",
+      metric: "lcp",
+      actual: metrics.coreWebVitals.lcp,
+      budget: PERFORMANCE_BUDGET.coreWebVitals.lcp,
+      severity: "critical",
+    });
+  }
+
+  return violations;
+}
+
+function parseSize(sizeStr) {
+  const units = { KB: 1024, MB: 1024 * 1024 };
+  const match = sizeStr.match(/^(\d+)(KB|MB)$/);
+  return match ? parseInt(match[1]) * units[match[2]] : 0;
+}
+```
+
+### CI/CD Performance Gates
+
+```yaml
+# .github/workflows/performance.yml
+name: Performance Checks
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  performance-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+
+      - name: Check bundle size
+        run: npx size-limit
+        env:
+          SIZE_LIMIT_BUNDLE_MAX_SIZE: 500KB
+
+      - name: Run Lighthouse CI
+        run: |
+          npm install -g @lhci/cli
+          lhci autorun --config lighthouserc.js
+        env:
+          LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
+
+      - name: Performance regression test
+        run: npm run test:performance
+
+      - name: Comment PR with results
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const results = JSON.parse(fs.readFileSync('./performance-results.json', 'utf8'));
+
+            const comment = `
+            ## 🚀 Performance Results
+
+            ### Bundle Analysis
+            - Main bundle: ${results.bundle.main.size}
+            - Vendor bundle: ${results.bundle.vendor.size}
+            - Total size: ${results.bundle.total.size}
+
+            ### Core Web Vitals
+            - LCP: ${results.vitals.lcp}ms
+            - FID: ${results.vitals.fid}ms
+            - CLS: ${results.vitals.cls}
+
+            ### Performance Score: ${results.score}/100
+
+            ${results.violations.length > 0 ? '⚠️ Performance violations detected!' : '✅ All performance budgets met!'}
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+```
+
+### Enterprise Monitoring Dashboard
+
+```jsx
+// Enterprise performance dashboard
+function EnterprisePerformanceDashboard() {
+  const [metrics, setMetrics] = useState({});
+  const [alerts, setAlerts] = useState([]);
+
+  useEffect(() => {
+    // Real-time metrics collection
+    const collectMetrics = () => {
+      const newMetrics = {
+        timestamp: Date.now(),
+        bundleSize: getBundleSize(),
+        coreWebVitals: getCoreWebVitals(),
+        runtime: getRuntimeMetrics(),
+        network: getNetworkMetrics(),
+        userExperience: getUserExperienceMetrics(),
+      };
+
+      setMetrics(newMetrics);
+
+      // Check for violations
+      const violations = checkPerformanceBudget(newMetrics);
+      if (violations.length > 0) {
+        setAlerts((prev) => [...prev, ...violations]);
+      }
+    };
+
+    collectMetrics();
+    const interval = setInterval(collectMetrics, 30000); // Every 30 seconds
+
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="enterprise-dashboard">
+      <header>
+        <h1>🚀 Enterprise Performance Dashboard</h1>
+        <div className="status-indicators">
+          <StatusIndicator
+            label="Bundle Size"
+            value={metrics.bundleSize?.total}
+            budget={PERFORMANCE_BUDGET.bundleSize.total}
+          />
+          <StatusIndicator
+            label="LCP"
+            value={metrics.coreWebVitals?.lcp}
+            budget={PERFORMANCE_BUDGET.coreWebVitals.lcp}
+          />
+          <StatusIndicator
+            label="Memory Usage"
+            value={metrics.runtime?.memoryUsage}
+            budget={PERFORMANCE_BUDGET.runtime.maxMemoryUsage}
+          />
+        </div>
+      </header>
+
+      <div className="dashboard-grid">
+        <BundleSizeChart data={metrics.bundleSize} />
+        <CoreWebVitalsChart data={metrics.coreWebVitals} />
+        <RuntimePerformanceChart data={metrics.runtime} />
+        <NetworkRequestsChart data={metrics.network} />
+        <UserExperienceChart data={metrics.userExperience} />
+      </div>
+
+      <AlertsPanel
+        alerts={alerts}
+        onDismiss={(index) => {
+          setAlerts((prev) => prev.filter((_, i) => i !== index));
+        }}
+      />
+    </div>
+  );
+}
+
+function StatusIndicator({ label, value, budget }) {
+  const isViolation = value > budget;
+  const percentage = (value / budget) * 100;
+
+  return (
+    <div className={`status-indicator ${isViolation ? "violation" : "ok"}`}>
+      <span className="label">{label}</span>
+      <span className="value">{value}</span>
+      <div className="progress-bar">
+        <div className="progress-fill" style={{ width: `${Math.min(percentage, 100)}%` }} />
+      </div>
+    </div>
+  );
+}
+```
+
+## 🔍 Advanced Anti-Patterns and Their Solutions
+
+### 1. Unnecessary Re-renders
+
+```jsx
+// Anti-pattern: Object/array creation in render
+function BadComponent({ items }) {
+  return (
+    <div>
+      {items.map((item) => (
+        <div key={item.id}>
+          {/* This creates a new object every render */}
+          <ChildComponent style={{ margin: 10, padding: 5 }} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Solution: Extract static objects
+const staticStyle = { margin: 10, padding: 5 };
+
+function GoodComponent({ items }) {
+  return (
+    <div>
+      {items.map((item) => (
+        <div key={item.id}>
+          <ChildComponent style={staticStyle} />
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+### 2. Context Overuse
+
+```jsx
+// Anti-pattern: Large context objects
+const AppContext = createContext();
+
+function AppProvider({ children }) {
+  const [state, setState] = useState({
+    user: null,
+    settings: {},
+    theme: "light",
+    notifications: [],
+    // ... 20+ properties
+  });
+
+  return <AppContext.Provider value={{ state, setState }}>{children}</AppContext.Provider>;
+}
+
+// Solution: Split contexts and use selectors
+const UserContext = createContext();
+const ThemeContext = createContext();
+const NotificationsContext = createContext();
+
+function useUser() {
+  const context = useContext(UserContext);
+  if (!context) throw new Error("useUser must be used within UserProvider");
+  return context;
+}
+
+function useThemeSelector(selector) {
+  const theme = useContext(ThemeContext);
+  return useMemo(() => selector(theme), [theme, selector]);
+}
+```
+
+### 3. Over-optimization
+
+```jsx
+// Anti-pattern: Premature optimization
+function OverOptimizedComponent({ data }) {
+  // Don't memoize everything blindly
+  const processedData = useMemo(() => {
+    return data.map((item) => ({ ...item, processed: true }));
+  }, [data]);
+
+  const handleClick = useCallback(() => {
+    console.log("clicked");
+  }, []); // Empty dependency array when it should include relevant deps
+
+  const style = useMemo(() => ({ color: "red" }), []); // Static object
+
+  return (
+    <div style={style} onClick={handleClick}>
+      {processedData.map((item) => (
+        <div key={item.id}>{item.name}</div>
+      ))}
+    </div>
+  );
+}
+
+// Solution: Optimize based on profiling data
+function ProperlyOptimizedComponent({ data }) {
+  // Only memoize expensive computations
+  const expensiveResult = useMemo(() => {
+    return data.filter((item) => expensiveOperation(item));
+  }, [data]);
+
+  // Don't memoize simple values
+  const style = { color: "red" };
+
+  // Include all necessary dependencies
+  const handleClick = useCallback(() => {
+    console.log("clicked with data:", data);
+  }, [data]);
+
+  return (
+    <div style={style} onClick={handleClick}>
+      {expensiveResult.map((item) => (
+        <div key={item.id}>{item.name}</div>
+      ))}
+    </div>
+  );
+}
+```
+
+## 📊 Performance Benchmarking Framework
+
+### Automated Performance Testing
+
+```javascript
+// performance-benchmark.js
+export class PerformanceBenchmark {
+  constructor(name) {
+    this.name = name;
+    this.results = [];
+    this.isRunning = false;
+  }
+
+  async run(testFn, iterations = 100, warmupIterations = 10) {
+    if (this.isRunning) {
+      throw new Error("Benchmark already running");
+    }
+
+    this.isRunning = true;
+    this.results = [];
+
+    try {
+      console.log(`🏃 Running benchmark: ${this.name}`);
+
+      // Warmup phase
+      console.log(`🔥 Warmup phase (${warmupIterations} iterations)...`);
+      for (let i = 0; i < warmupIterations; i++) {
+        await testFn();
+      }
+
+      // Force garbage collection if available
+      if (typeof window !== "undefined" && window.gc) {
+        window.gc();
+      }
+
+      // Benchmark phase
+      console.log(`📊 Benchmark phase (${iterations} iterations)...`);
+      for (let i = 0; i < iterations; i++) {
+        const startTime = performance.now();
+        const startMemory = performance.memory?.usedJSHeapSize;
+
+        await testFn();
+
+        const endTime = performance.now();
+        const endMemory = performance.memory?.usedJSHeapSize;
+
+        this.results.push({
+          iteration: i,
+          duration: endTime - startTime,
+          memoryDelta: endMemory ? endMemory - startMemory : 0,
+          timestamp: Date.now(),
+        });
+      }
+
+      return this.getResults();
+    } finally {
+      this.isRunning = false;
+    }
+  }
+
+  getResults() {
+    const durations = this.results.map((r) => r.duration);
+    const memoryDeltas = this.results.map((r) => r.memoryDelta).filter(Boolean);
+
+    return {
+      name: this.name,
+      iterations: this.results.length,
+      averageDuration: durations.reduce((a, b) => a + b, 0) / durations.length,
+      medianDuration: this.calculateMedian(durations),
+      minDuration: Math.min(...durations),
+      maxDuration: Math.max(...durations),
+      p95Duration: this.calculatePercentile(durations, 95),
+      p99Duration: this.calculatePercentile(durations, 99),
+      averageMemoryDelta:
+        memoryDeltas.length > 0 ? memoryDeltas.reduce((a, b) => a + b, 0) / memoryDeltas.length : 0,
+      results: this.results,
+    };
+  }
+
+  calculateMedian(values) {
+    const sorted = [...values].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+  }
+
+  calculatePercentile(values, percentile) {
+    const sorted = [...values].sort((a, b) => a - b);
+    const index = (percentile / 100) * (sorted.length - 1);
+    const lower = Math.floor(index);
+    const upper = Math.ceil(index);
+    const weight = index % 1;
+
+    if (upper >= sorted.length) return sorted[sorted.length - 1];
+    return sorted[lower] * (1 - weight) + sorted[upper] * weight;
+  }
+}
+
+// Usage
+async function benchmarkReactComponents() {
+  const benchmark = new PerformanceBenchmark("React Component Rendering");
+
+  const results = await benchmark.run(async () => {
+    // Render and measure component
+    const element = document.createElement("div");
+    document.body.appendChild(element);
+
+    ReactDOM.render(<ExpensiveComponent data={largeDataset} />, element);
+
+    // Wait for render to complete
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    ReactDOM.unmountComponentAtNode(element);
+    document.body.removeChild(element);
+  }, 50);
+
+  console.log("Benchmark Results:", results);
+
+  // Send to analytics
+  if (typeof window !== "undefined" && window.gtag) {
+    window.gtag("event", "performance_benchmark", {
+      benchmark_name: results.name,
+      average_duration: results.averageDuration,
+      p95_duration: results.p95Duration,
+    });
+  }
+
+  return results;
+}
+```
+
+### Comparative Performance Analysis
+
+```jsx
+// Performance comparison tool
+function PerformanceComparison({ implementations }) {
+  const [results, setResults] = useState({});
+  const [isRunning, setIsRunning] = useState(false);
+
+  const runComparison = async () => {
+    setIsRunning(true);
+    const comparisonResults = {};
+
+    for (const [name, implementation] of Object.entries(implementations)) {
+      console.log(`Running ${name}...`);
+
+      const benchmark = new PerformanceBenchmark(name);
+      const result = await benchmark.run(implementation.testFn, implementation.iterations);
+      comparisonResults[name] = result;
+    }
+
+    setResults(comparisonResults);
+    setIsRunning(false);
+  };
+
+  const getWinner = () => {
+    if (Object.keys(results).length === 0) return null;
+
+    return Object.entries(results).reduce((winner, [name, result]) => {
+      return !winner || result.averageDuration < winner.result.averageDuration
+        ? { name, result }
+        : winner;
+    }, null);
+  };
+
+  const winner = getWinner();
+
+  return (
+    <div className="performance-comparison">
+      <h2>⚡ Performance Comparison</h2>
+
+      <button onClick={runComparison} disabled={isRunning}>
+        {isRunning ? "Running..." : "Run Comparison"}
+      </button>
+
+      {Object.entries(results).length > 0 && (
+        <div className="results">
+          <h3>Results:</h3>
+          {winner && (
+            <div className="winner">
+              🏆 Winner: <strong>{winner.name}</strong> ({winner.result.averageDuration.toFixed(2)}
+              ms avg)
+            </div>
+          )}
+
+          <div className="comparison-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Implementation</th>
+                  <th>Avg Duration</th>
+                  <th>Median</th>
+                  <th>P95</th>
+                  <th>vs Winner</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(results).map(([name, result]) => (
+                  <tr key={name} className={winner?.name === name ? "winner-row" : ""}>
+                    <td>{name}</td>
+                    <td>{result.averageDuration.toFixed(2)}ms</td>
+                    <td>{result.medianDuration.toFixed(2)}ms</td>
+                    <td>{result.p95Duration.toFixed(2)}ms</td>
+                    <td>
+                      {winner
+                        ? `${((result.averageDuration / winner.result.averageDuration - 1) * 100).toFixed(1)}%`
+                        : "-"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Usage
+const implementations = {
+  "Original Implementation": {
+    testFn: async () => {
+      // Original slow implementation
+      await originalFunction(largeDataset);
+    },
+    iterations: 100,
+  },
+  "Optimized Implementation": {
+    testFn: async () => {
+      // Optimized implementation
+      await optimizedFunction(largeDataset);
+    },
+    iterations: 100,
+  },
+  "React 19 Optimized": {
+    testFn: async () => {
+      // React 19 optimized implementation
+      await react19OptimizedFunction(largeDataset);
+    },
+    iterations: 100,
+  },
+};
+
+<PerformanceComparison implementations={implementations} />;
+```
+
+## 🎯 Performance Optimization Roadmap
+
+### Phase 1: Foundation (Week 1-2)
+
+- [ ] Set up performance monitoring and alerting
+- [ ] Establish performance budgets
+- [ ] Implement bundle analysis
+- [ ] Enable React 19 Compiler
+- [ ] Set up CI/CD performance gates
+
+### Phase 2: Core Optimizations (Week 3-4)
+
+- [ ] Optimize bundle size (< 500KB)
+- [ ] Implement code splitting
+- [ ] Optimize images and assets
+- [ ] Improve Core Web Vitals scores
+- [ ] Set up performance profiling
+
+### Phase 3: Advanced Optimizations (Week 5-6)
+
+- [ ] Implement virtual scrolling for large lists
+- [ ] Optimize network requests
+- [ ] Add performance monitoring to production
+- [ ] Implement advanced caching strategies
+- [ ] Set up automated performance regression testing
+
+### Phase 4: Enterprise Scale (Week 7-8)
+
+- [ ] Implement enterprise monitoring dashboard
+- [ ] Set up performance alerting
+- [ ] Create performance documentation
+- [ ] Train team on performance best practices
+- [ ] Establish ongoing performance maintenance
+
+### Phase 5: Continuous Improvement (Ongoing)
+
+- [ ] Monitor performance metrics daily
+- [ ] Regular performance audits
+- [ ] Stay updated with React performance features
+- [ ] Optimize based on user feedback
+- [ ] Implement A/B testing for performance changes
+
+## 📚 Additional Resources
+
+- [React Performance Documentation](https://react.dev/learn/render-and-commit)
+- [Web Vitals](https://web.dev/vitals/)
+- [Lighthouse](https://developers.google.com/web/tools/lighthouse)
+- [Webpack Bundle Analyzer](https://github.com/webpack-contrib/webpack-bundle-analyzer)
+- [React DevTools Profiler](https://react.dev/learn/profile-a-react-app)
+
+## 🎯 Key Takeaways
+
+1. **React 19 Compiler**: Automatic optimization is here—embrace it but understand its limitations
+2. **Performance Monitoring**: Implement comprehensive monitoring before optimization
+3. **Enterprise Scale**: Performance at scale requires budgets, gates, and dashboards
+4. **Anti-patterns**: Avoid common pitfalls like unnecessary re-renders and context overuse
+5. **Benchmarking**: Use scientific benchmarking to measure and compare optimizations
+6. **Continuous Process**: Performance optimization is ongoing, not a one-time task
+7. **User Experience**: Always optimize for perceived performance, not just metrics
+8. **Team Knowledge**: Train your team on performance best practices and tools
+9. **Bundle Size Matters**: Keep your main bundle under 500KB gzipped
+10. **Code Splitting is Essential**: Split code at route and component levels
+11. **Memoization Prevents Waste**: Use React.memo, useMemo, and useCallback wisely
+12. **Network is Critical**: Optimize images, use caching, and preload resources
+13. **Monitor Everything**: Track performance metrics and set budgets
+14. **Test Performance**: Include performance tests in your CI/CD pipeline
+15. **Memory Management**: Prevent leaks with proper cleanup and resource tracking
+
+React 19 represents a quantum leap in React performance capabilities. By leveraging the compiler, implementing comprehensive monitoring, and following enterprise-grade optimization strategies, you can build applications that not only meet performance budgets but exceed user expectations. Remember: performance is a feature that directly impacts user satisfaction, conversion rates, and business success. 🚀

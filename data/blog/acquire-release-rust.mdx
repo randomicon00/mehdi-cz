@@ -1,0 +1,125 @@
+---
+title: "Acquire Release Ordering in Rust"
+date: "2024-09-26"
+tags: ["rust", "concurrency", "atomics", "memory ordering"]
+draft: false
+summary: Learn how Rust's Acquire and Release memory orderings work, their importance in concurrent programming, and how they enable lock-free synchronization between threads.
+---
+
+Rust, being a systems programming language, places great emphasis on memory safety without sacrificing performance. One
+of the critical features that Rust offers for concurrent programming is atomic operations, which ensure safe manipulation of shared data across threads without using locks. In this article, we’ll dive deep into two essential concepts in Rust atomics: **Acquire**
+and **Release** memory orderings.
+
+## What are Atomics?
+
+Atomics are operations on shared data that happen atomically, meaning they are indivisible and are guaranteed to be completed entirely or not at all. In Rust, atomic operations are provided by the `std::sync::atomic` module, where you can manipulate atomic integers (`AtomicUsize`, `AtomicI32`, etc.) and booleans (`AtomicBool`).
+
+The reason why atomics are useful is that they allow threads to share and update state without using heavier synchronization mechanisms like mutexes, which can cause performance bottlenecks due to blocking.
+
+However, atomics come with a catch: you need to specify memory ordering. This ensures that operations are not only atomic but happen in a predictable way, which is where **Acquire** and **Release** come into play.
+
+## Memory Ordering: Acquire and Release
+
+Memory orderings define how memory operations (reads and writes) behave across threads in the presence of atomics. They help in establishing synchronization between threads, ensuring data visibility in a safe way.
+
+### Acquire Ordering
+
+When a load (read) operation uses **Acquire** memory ordering, it ensures that all memory writes (by other threads) that precede a corresponding **Release** operation become visible before the acquire load. Simply put:
+
+- **Acquire** ensures that **reads** of shared data happen **after** the acquire operation.
+
+Imagine a situation where one thread writes some data and sets a flag to signal completion. Another thread waits on that flag to start processing. The waiting thread needs to ensure it sees the data written before the flag, not stale or partial data. The acquire ordering guarantees that the flag’s change is only seen after the associated data has been fully written.
+
+```rust
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::thread;
+
+let flag = Arc::new(AtomicBool::new(false));
+let flag_clone = Arc::clone(&flag);
+
+// Thread 1
+let handle1 = thread::spawn(move || {
+    // Write some data (in this case, imaginary)
+    // Now signal that the data is ready
+    flag.store(true, Ordering::Release); // Release memory ordering
+});
+
+// Thread 2
+let handle2 = thread::spawn(move || {
+    while !flag_clone.load(Ordering::Acquire) {
+        // Spin wait
+    }
+    // Now it's guaranteed that the data written by Thread 1 is visible
+    println!("Data is now ready!");
+});
+
+handle1.join().unwrap();
+handle2.join().unwrap();
+```
+
+In this example:
+
+- **Thread 1** sets the flag using `Ordering::Release`.
+- **Thread 2** reads the flag using `Ordering::Acquire`.
+- This ensures that any writes performed by **Thread 1** (before the release) are visible to **Thread 2** once
+  it sees the flag as `true`.
+
+### Release Ordering
+
+When a store (write) operation uses **Release** memory ordering, it ensures that all previous writes in the current
+thread happen **before** the release store. This means the released value can only be seen by other threads after all
+preceding writes are visible to them.
+
+In the previous example, `flag.store(true, Ordering::Release)` guarantees that the data written before setting the flag
+will be visible to other threads that acquire the flag.
+
+In simpler terms, **Release** ensures that writes preceding the release are made visible before the store itself is seen
+by other threads.
+
+### Acquire-Release Synchronization
+
+Together, **Acquire** and **Release** allow you to build synchronization points between threads. They are typically used when one thread (or multiple) writes to shared memory, and another thread (or threads) reads from it.
+
+Acquire-release synchronization creates a happens-before relationship:
+
+- The release store happens before the acquire load.
+- This guarantees that memory writes performed by one thread are visible to other threads.
+
+Acquire-release is crucial in concurrent algorithms like **lock-free queues**, where the producer thread releases new work, and the consumer thread acquires it in a synchronized fashion.
+
+The following schema demonstrates how **Release** ensures that prior writes are visible to other threads and how **Acquire** guarantees that the reading thread sees those writes when it observes the flag.
+
+```text
+Thread 1 (Writer)                Memory               Thread 2 (Reader)
+-----------------                ------               -----------------
+   [Write Data]                                       [Load Acquire]
+       ↓                                                 ↑
+[Release Store]    ------------>     (Flag = true)   <------------    (Wait for Flag)
+```
+
+1. **Thread 1** performs a write operation (e.g., writes some data to a shared variable).
+2. **Thread 1** then performs a **Release Store**, signaling that the data is ready for consumption. The memory write preceding this operation is guaranteed to be visible to other threads that acquire this flag.
+3. **The Release Store** sets a shared flag (`flag = true`) in memory.
+4. **Thread 2** waits for the flag by continuously loading it with an **Acquire Load**. The acquire ensures that once **Thread 2** sees the flag as true, it also sees the data that was written before the **Release Store**.
+5. **Thread 2** then reads the data, ensuring that the data read happens after the acquire operation.
+
+## Why Acquire and Release are Useful?
+
+1. **Synchronization**: Acquire-release semantics allow threads to synchronize their operations without the need for heavy locks, making it highly efficient in multi-threaded scenarios.
+
+2. **Data Visibility**: With acquire-release ordering, threads can safely share memory where one writes and the other reads. It ensures that the reader thread sees the most up-to-date writes, preventing data races.
+
+3. **Performance**: Lock-free algorithms using atomics can be faster than traditional mutex-based synchronization because they avoid blocking, reducing contention and overhead in high-concurrency systems.
+
+4. **Building Blocks for More Complex Synchronization**: Acquire and Release form the foundation of more advanced synchronization primitives. By using these orderings, you can implement efficient lock-free data structures like queues, stacks, and more.
+
+## Last Words
+
+In my experience working with Rust, I've found that atomics offer an elegant solution to one of the toughest challenges in concurrent programming: safely sharing data between threads without incurring the performance costs of traditional locks. Using **Acquire** and **Release** memory orderings, I've been able to ensure that operations happen in a well-defined, predictable manner, avoiding the subtle bugs that can arise from improper memory synchronization.
+
+When I first started working with atomics in Rust, the power of these memory orderings wasn’t immediately obvious. But once I dug into the mechanics of **Acquire** and **Release**, it became clear that they allow a thread to confidently read shared data only after ensuring that all prior writes by another thread are visible. This synchronization is essential in multi-threaded applications, where operations need to be fast, lock-free, and safe.
+
+For anyone building performance-critical systems, these atomic orderings are essential tools. They make it possible to implement lock-free algorithms that scale well in high-concurrency environments, without the blocking overhead of locks. The more I work with Rust’s concurrency primitives, the more I appreciate how foundational these memory orderings are in making systems both **safe** and **efficient**.
+
+If you’re working on Rust concurrency, mastering **Acquire** and **Release** will undoubtedly sharpen your ability to write highly performant, lock-free code. The power of these primitives lies in their ability to give you fine-grained control over the visibility of memory operations across threads, which is vital for any system where performance and correctness must coexist.

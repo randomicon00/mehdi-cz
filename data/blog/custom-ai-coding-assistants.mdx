@@ -1,0 +1,206 @@
+---
+title: "Building Custom AI Coding Assistants"
+date: "2025-09-16"
+tags: ["ai", "assistant", "custom", "fine-tuning"]
+draft: false
+summary: "Create specialized AI coding assistants tailored to your team's coding standards, frameworks, and domain knowledge."
+---
+
+Build custom AI assistants that understand your codebase, follow your team's conventions, and provide context-aware suggestions.
+
+## Fine-Tuning for Your Codebase
+
+```python
+import openai
+import json
+
+def prepare_training_data(code_examples):
+    """Prepare training data from your codebase"""
+    training_data = []
+
+    for example in code_examples:
+        training_data.append({
+            "messages": [
+                {"role": "user", "content": f"Write a {example['description']}"},
+                {"role": "assistant", "content": example['code']}
+            ]
+        })
+
+    return training_data
+
+def fine_tune_model(training_file_path):
+    """Fine-tune GPT model on your codebase"""
+
+    # Upload training file
+    file_response = openai.File.create(
+        file=open(training_file_path, "rb"),
+        purpose='fine-tune'
+    )
+
+    # Create fine-tuning job
+    fine_tune_response = openai.FineTuningJob.create(
+        training_file=file_response.id,
+        model="gpt-3.5-turbo",
+        hyperparameters={
+            "n_epochs": 3,
+        }
+    )
+
+    return fine_tune_response.id
+
+# Example training data for React components
+react_examples = [
+    {
+        "description": "React hook for API data fetching with loading state",
+        "code": """
+import { useState, useEffect } from 'react';
+
+export const useApiData = (url) => {
+    const [data, setData] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    useEffect(() => {
+        fetch(url)
+            .then(res => res.json())
+            .then(setData)
+            .catch(setError)
+            .finally(() => setLoading(false));
+    }, [url]);
+
+    return { data, loading, error };
+};
+        """
+    }
+]
+```
+
+## Context-Aware Assistant
+
+```python
+class CustomCodingAssistant:
+    def __init__(self, model_id, project_context):
+        self.model_id = model_id  # Your fine-tuned model
+        self.project_context = project_context
+        self.conversation_history = []
+
+    def get_project_context(self):
+        """Build context from project files"""
+        context = f"""
+        Project: {self.project_context['name']}
+        Tech Stack: {', '.join(self.project_context['tech_stack'])}
+        Coding Standards: {self.project_context['standards']}
+        Architecture: {self.project_context['architecture']}
+        """
+        return context
+
+    def ask(self, question, code_context=""):
+        """Ask the assistant with full project context"""
+
+        system_message = f"""
+        You are a coding assistant for this project:
+        {self.get_project_context()}
+
+        Follow these guidelines:
+        - Use the project's established patterns
+        - Follow the coding standards mentioned
+        - Consider the existing architecture
+        - Provide complete, runnable code examples
+        """
+
+        messages = [
+            {"role": "system", "content": system_message},
+            *self.conversation_history,
+            {"role": "user", "content": f"{question}\n\nCode context:\n{code_context}"}
+        ]
+
+        response = openai.ChatCompletion.create(
+            model=self.model_id,
+            messages=messages
+        )
+
+        answer = response.choices[0].message.content
+
+        # Store in conversation history
+        self.conversation_history.extend([
+            {"role": "user", "content": question},
+            {"role": "assistant", "content": answer}
+        ])
+
+        return answer
+
+# Usage
+project_info = {
+    "name": "E-commerce Platform",
+    "tech_stack": ["React", "TypeScript", "Node.js", "PostgreSQL"],
+    "standards": "ESLint Airbnb, Prettier, conventional commits",
+    "architecture": "Microservices with REST APIs"
+}
+
+assistant = CustomCodingAssistant("ft:gpt-3.5-turbo:your-org", project_info)
+
+response = assistant.ask(
+    "Create a product search component with filtering",
+    code_context="// Existing ProductCard component available"
+)
+```
+
+## Team-Specific Patterns
+
+```python
+def create_team_assistant_prompt():
+    """Create a system prompt tailored to your team"""
+    return """
+    You are a senior developer on our team. Follow these practices:
+
+    Code Style:
+    - Use functional components with hooks
+    - Prefer composition over inheritance
+    - Write self-documenting code with clear naming
+    - Add TypeScript types for all function parameters
+
+    Testing:
+    - Write tests for all public methods
+    - Use Jest and Testing Library
+    - Mock external dependencies
+    - Aim for 90%+ code coverage
+
+    Architecture:
+    - Follow Clean Architecture principles
+    - Separate concerns with proper layering
+    - Use dependency injection
+    - Apply SOLID principles
+
+    When suggesting code:
+    - Include error handling
+    - Add JSDoc comments
+    - Consider performance implications
+    - Suggest refactoring opportunities
+    """
+```
+
+## Why this matters
+
+- A tailored assistant fits your stack, style, and guardrails.
+- You reduce context switching and institutionalize your best practices.
+- It scales senior guidance to every PR.
+
+## How to use this today
+
+- Start with a narrow skill (e.g., writing tests or docs) and expand.
+- Feed it your conventions: lint rules, templates, domain language.
+- Log prompts/outputs for auditing and improvement.
+
+## Common pitfalls
+
+- Context starvation: provide repo indexes and architectural docs.
+- Unbounded scope: treat features as product work with owners.
+- Privacy: scrub secrets and PII; keep data residency in mind.
+
+## What to try next
+
+- Add a “coach mode” that explains trade-offs, not just code.
+- Generate onboarding paths for new hires tailored to your codebase.
+- Let it suggest tech debt fixes ranked by impact.
+
+**Pro tip:** Regularly update your assistant's training data with new code patterns and team decisions to keep it current.
