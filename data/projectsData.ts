@@ -48,7 +48,7 @@ export const projectsData: Project[] = [
     title: "Go Async Image Processing",
     description:
       "Go backend demonstrating async job processing using worker pools. It features concurrent image processing (ex: resize and thumbnail), job queue management, graceful shutdown, and logging.",
-    imgSrc: "/static/images/go_queue.png",
+    imgSrc: "/static/images/go_worker_pool.png",
     href: "https://github.com/mehdiakiki/go-async-image-processing",
     type: "opensource",
   },
