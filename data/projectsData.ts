@@ -11,7 +11,7 @@ export const projectsData: Project[] = [
     title: "MonitorMe",
     description: `Worked as the Lead Software Engineer for MonitorMe which is an open-source full-stack observability framework for distributed microservices.`,
     imgSrc: "/static/images/monitorme.png",
-    href: "https://github.com/randomicon00/monitorme",
+    href: "https://github.com/mehdiakiki/monitorme",
     type: "personal",
   },
   {
@@ -41,7 +41,7 @@ export const projectsData: Project[] = [
     description:
       "Interactive web–based DICOM image viewer built with React and Cornerstone3D. Supports slice navigation, zoom, pan, and window-level adjustments.",
     imgSrc: "/static/images/dicom_viewer.png",
-    href: "https://github.com/randomicon00/dicomviewer",
+    href: "https://github.com/mehdiakiki/dicomviewer",
     type: "personal",
   },
   {
@@ -49,7 +49,7 @@ export const projectsData: Project[] = [
     description:
       "A lightweight, high-performance job queue library written in Go. Easy to integrate for background task processing and scalable microservices.",
     imgSrc: "/static/images/go_queue.png",
-    href: "https://github.com/randomicon00/go-queue",
+    href: "https://github.com/mehdiakiki/go-async-image-processing",
     type: "opensource",
   },
 ];

@@ -8,11 +8,11 @@ const siteMetadata = {
   language: "en-us",
   theme: "system", // system, dark or light
   siteUrl: "https://www.mehdi.cz",
-  siteRepo: "https://github.com/randomicon00/mediaknet",
+  siteRepo: "https://github.com/mehdiakiki/mehdi-cz",
   siteLogo: `${process.env.BASE_PATH || ""}/static/images/logo.png`,
   socialBanner: `${process.env.BASE_PATH || ""}/static/images/twitter-card.png`,
   email: "mehdi.akiki@gmail.com",
-  github: "https://github.com/randomicon00",
+  github: "https://github.com/mehdiakiki",
   x: "https://twitter.com/mehdiakiki",
   twitter: "https://twitter.com/mehdiakiki",
   linkedin: "https://www.linkedin.com/in/mehdiakiki",
