@@ -45,9 +45,9 @@ export const projectsData: Project[] = [
     type: "personal",
   },
   {
-    title: "Go Queue",
+    title: "Go Async Image Processing",
     description:
-      "A lightweight, high-performance job queue library written in Go. Easy to integrate for background task processing and scalable microservices.",
+      "Go backend demonstrating async job processing using worker pools. It features concurrent image processing (ex: resize and thumbnail), job queue management, graceful shutdown, and logging.",
     imgSrc: "/static/images/go_queue.png",
     href: "https://github.com/mehdiakiki/go-async-image-processing",
     type: "opensource",
